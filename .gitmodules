@@ -1,3 +1,6 @@
 [submodule "FMs"]
 	path = FMs
 	url = git@github.com:takuti/factorization-machines.git
+[submodule "ISGD"]
+	path = ISGD
+	url = git@github.com:takuti/incremental-sgd.git
