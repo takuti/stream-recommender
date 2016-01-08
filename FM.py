@@ -1,108 +1,83 @@
-from abc import ABCMeta, abstractmethod
 import numpy as np
-from sklearn import metrics
 
-class SGD:
-    __metaclass__ = ABCMeta
+class FM:
+    def __init__(self, n_user, n_item, k, l2_reg_w0=.01, l2_reg_w=.01, l2_reg_V=.01, learn_rate=.01):
 
-    def __init__(self, X, y, l2_reg_w0=0.01, l2_reg_w=0.01, l2_reg_V=0.01, learn_rate=0.01):
-        self.X, self.y = X, y
-        self.n, self.p = X.shape # number of samples and their dimension
+        self.n_user = n_user
+        self.n_item = n_item
+        self.known_users = np.array([])
+        self.known_items = np.array([])
 
         # parameter settings
-        self.k = int(np.sqrt(self.p)) # for the low-rank assumption of pairwise interaction
+        self.k = k
         self.l2_reg_w0 = l2_reg_w0
         self.l2_reg_w = l2_reg_w
+        #self.l2_reg_V = np.ones(self.k) * l2_reg_V # each of the factorization dimensionality
         self.l2_reg_V = l2_reg_V
         self.learn_rate = learn_rate
+
+        self.p = n_user + n_item
 
         # initialize the model parameters
         self.w0 = 0.
         self.w = np.zeros(self.p)
-        self.V = np.random.random((self.p, self.k))
+        self.V = np.random.normal(0., 0.1, (self.p, self.k))
 
-    def predict(self, x):
-        """
-        Return a predicted value for an input vector x.
-        """
-
-        # efficient vectorized implementation of the pairwise interaction term
-        interaction = float(np.sum(np.dot(self.V.T, np.array([x]).T) ** 2 - np.dot(self.V.T ** 2, np.array([x]).T ** 2)) / 2.)
-
-        return self.w0 + np.inner(self.w, x) + interaction
-
-    def fit(self):
-        """
-        Learn the model parameters with SGD. Iterate until convergence.
-        """
-
-        prev = float('inf')
-        current = 0.
-        eps = 1e-3
-
-        history = []
-        while abs(prev - current) > eps:
-            prev = current
-            for x, y in zip(self.X, self.y): # for each (x, y) training sample
-                current = self.update(x, y)
-            history.append(current)
-        return history
-
-    def update(self, x, y):
+    def update(self, u_index, i_index, prev_w0=None, prev_w=None):
         """
         Update the model parameters based on the given vector-value pair.
         """
 
-        # common part of the gradient
-        grad_base = self._loss_derivative(x, y)
+        u = u_index
+        i = self.n_user + i_index
 
-        grad_w0 = grad_base * 1.
-        self.w0 = self.w0 - self.learn_rate * (grad_w0 + 2. * self.l2_reg_w0 * self.w0)
+        if u_index not in self.known_users: self.known_users = np.append(self.known_users, u_index)
+        u_vec = self.V[u]
 
-        for i in range(self.p):
-            if x[i] == 0.: continue
-            grad_w = grad_base * x[i]
-            self.w[i] = self.w[i] - self.learn_rate * (grad_w + 2. * self.l2_reg_w * self.w[i])
+        if i_index not in self.known_items: self.known_items = np.append(self.known_items, i_index)
+        i_vec = self.V[i]
 
-            for f in range(self.k):
-                grad_V = grad_base * x[i] * (sum(x * self.V[:, f]) - x[i] * self.V[i, f])
-                self.V[i, f] = self.V[i, f] - self.learn_rate * (grad_V + 2. * self.l2_reg_V * self.V[i, f])
+        pred = np.inner(self.V[u], self.V[i]) + self.w0 + self.w[u] + self.w[i]
+        err = 1. - pred
 
-        return self._evaluate()
+        # Updating regularization parameters
+        if prev_w0 != None and prev_w != None:
+            self.l2_reg_w0 = max(0., self.l2_reg_w0 + 4. * self.learn_rate * (err * self.learn_rate * prev_w0))
+            self.l2_reg_w = max(0., self.l2_reg_w + 4. * self.learn_rate * (err * self.learn_rate * (prev_w[u] + prev_w[i])))
 
-    @abstractmethod
-    def _loss_derivative(self, x, y):
-        # for grad_base
-        pass
+        # Updating model parameters
+        prev_w0 = self.w0
+        self.w0 = self.w0 + 2. * self.learn_rate * (err * 1. - self.l2_reg_w0 * self.w0)
 
-    @abstractmethod
-    def _evaluate(self):
-        # RMSE for regression
-        # AUC for classification
-        pass
+        # x_u and x_i are 1.0
+        prev_w = self.w
+        self.w[u] = self.w[u] + 2. * self.learn_rate * (err * 1. - self.l2_reg_w * self.w[u])
+        self.w[i] = self.w[i] + 2. * self.learn_rate * (err * 1. - self.l2_reg_w * self.w[i])
 
-class Regression(SGD):
-    def _loss_derivative(self, x, y):
-        return 2. * (self.predict(x) - y)
+        #s = np.sum(self.V, axis=0)
+        #prev_V = np.ones((self.p, self.k)) * self.V
+        self.V[u] = u_vec + 2. * self.learn_rate * (err * i_vec - self.l2_reg_V * u_vec)
+        self.V[i] = i_vec + 2. * self.learn_rate * (err * u_vec - self.l2_reg_V * i_vec)
 
-    def _evaluate(self):
-        # Efficient vectorized RMSE computation
-        linear = np.dot(self.X, np.array([self.w]).T).T
-        interaction = np.array([np.sum(np.dot(self.X, self.V) ** 2 - np.dot(self.X ** 2, self.V ** 2), axis=1) / 2.])
-        y_pred = self.w0 + linear + interaction
-        y_pred = y_pred.reshape((self.n))
+        return prev_w0, prev_w
+        # Updating regularization parameters (use both 't' and 't+1')
+        #self.l2_reg_V = np.maximum(0., self.l2_reg_V + self.learn_rate * (err * self.learn_rate * (np.sum(self.V, axis=0) * prev_sum - np.sum(self.V * prev_V, axis=0))))
 
-        return metrics.mean_squared_error(self.y, y_pred) ** 0.5
+    def recommend(self, u_index, N, history_vec):
 
-class Classification(SGD):
-    def _loss_derivative(self, x, y):
-        return (1. / (1. + np.e ** (- self.predict(x) * y)) - 1) * y
+        recos = []
 
-    def _evaluate(self):
-        linear = np.dot(self.X, np.array([self.w]).T).T
-        interaction = np.array([np.sum(np.dot(self.X, self.V) ** 2 - np.dot(self.X ** 2, self.V ** 2), axis=1) / 2.])
-        y_pred = self.w0 + linear + interaction
-        y_pred = y_pred.reshape((self.n))
+        i_offset = self.n_user
 
-        fpr, tpr, thresholds = metrics.roc_curve(self.y, y_pred, pos_label=1)
-        return metrics.auc(fpr, tpr)
+        pred = np.dot(np.array([self.V[u_index]]), self.V[i_offset:].T) + self.w0 + self.w[u_index] + np.array([self.w[i_offset:]])
+        scores = np.abs(1. - pred.reshape(self.n_item))
+
+        cnt = 0
+        for i_index in np.argsort(scores):
+            if history_vec[i_index] == 1: continue
+            recos.append(i_index)
+            cnt += 1
+            if cnt == N: break
+
+        return recos
+
