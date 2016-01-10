@@ -1,6 +1,6 @@
 import numpy as np
 
-class ISGD:
+class iMF:
     def __init__(self, n_user, n_item, k, l2_reg=.01, learn_rate=.01):
 
         self.n_user = n_user

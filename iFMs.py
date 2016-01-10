@@ -1,6 +1,6 @@
 import numpy as np
 
-class FM:
+class iFMs:
     def __init__(self, n_user, n_item, k, l2_reg_w0=.01, l2_reg_w=.01, l2_reg_V=.01, learn_rate=.01):
 
         self.n_user = n_user
