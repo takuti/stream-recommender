@@ -54,7 +54,8 @@ class IncrementalBiasedMF:
         self.w0 = self.w0 + 2. * self.learn_rate * (err * 1. - self.l2_reg_w0 * self.w0)
 
         # x_u and x_i are 1.0
-        prev_w = self.w
+        prev_w = np.empty_like(self.w)
+        prev_w[:] = self.w
         self.w[u] = self.w[u] + 2. * self.learn_rate * (err * 1. - self.l2_reg_w * self.w[u])
         self.w[i] = self.w[i] + 2. * self.learn_rate * (err * 1. - self.l2_reg_w * self.w[i])
 
