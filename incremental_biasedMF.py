@@ -36,10 +36,7 @@ class IncrementalBiasedMF:
         i = self.n_user + i_index
 
         if u_index not in self.known_users: self.known_users = np.append(self.known_users, u_index)
-        u_vec = self.V[u]
-
         if i_index not in self.known_items: self.known_items = np.append(self.known_items, i_index)
-        i_vec = self.V[i]
 
         pred = np.inner(self.V[u], self.V[i]) + self.w0 + self.w[u] + self.w[i]
         err = 1. - pred
@@ -59,10 +56,10 @@ class IncrementalBiasedMF:
         self.w[u] = self.w[u] + 2. * self.learn_rate * (err * 1. - self.l2_reg_w * self.w[u])
         self.w[i] = self.w[i] + 2. * self.learn_rate * (err * 1. - self.l2_reg_w * self.w[i])
 
-        #s = np.sum(self.V, axis=0)
-        #prev_V = np.ones((self.p, self.k)) * self.V
-        self.V[u] = u_vec + 2. * self.learn_rate * (err * i_vec - self.l2_reg_V * u_vec)
-        self.V[i] = i_vec + 2. * self.learn_rate * (err * u_vec - self.l2_reg_V * i_vec)
+        next_u_vec = self.V[u] + 2. * self.learn_rate * (err * self.V[i] - self.l2_reg_V * self.V[u])
+        next_i_vec = self.V[i] + 2. * self.learn_rate * (err * self.V[u] - self.l2_reg_V * self.V[i])
+        self.V[u] = next_u_vec
+        self.V[i] = next_i_vec
 
         return prev_w0, prev_w
         # Updating regularization parameters (use both 't' and 't+1')
