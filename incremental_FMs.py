@@ -54,6 +54,8 @@ class IncrementalFMs:
                 s = float(sum(recalls))
                 avg = s / window_size if (i + 1 >= window_size) else s / (i + 1)
                 avgs.append(avg)
+            else:
+                avgs.append(avgs[-1])
 
             # 3. update the model with the observed event
             self.__update(d)
