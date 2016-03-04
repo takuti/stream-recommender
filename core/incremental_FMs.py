@@ -1,5 +1,7 @@
 import time
 import numpy as np
+import scipy.sparse as sp
+from sklearn.utils.extmath import safe_sparse_dot
 
 class IncrementalFMs:
     """
@@ -10,6 +12,7 @@ class IncrementalFMs:
         self.n_user = n_user
         self.n_item = n_item
         self.contexts = contexts
+        self.n_context = len(contexts)
 
         self.p = n_user + n_item
         if 'dt' in contexts: self.p += 1
@@ -126,12 +129,21 @@ class IncrementalFMs:
 
         i_offset = self.n_user
 
-        #pred = np.dot(np.array([self.V[u_index]]), self.V[i_offset:].T) + self.w0 + self.w[u_index] + np.array([self.w[i_offset:]])
-        #pred = pred.reshape(pred.shape[1])
-
         # i_mat is (p, n_item) for all possible pairs of the user (u_index) and all items
-        interaction = np.sum(np.dot(self.V.T, i_mat) ** 2 - np.dot(self.V.T ** 2, i_mat ** 2), 0) / 2. # (n_item,)
-        pred = self.w0 + np.dot(self.w, i_mat) + interaction
+        A = safe_sparse_dot(self.V.T, i_mat)
+        if sp.issparse(A):
+            A.data[:] = A.data ** 2
+        else:
+            A = A ** 2
+
+        sq_i_mat = i_mat.copy()
+        sq_i_mat.data[:] = sq_i_mat.data ** 2
+        B = safe_sparse_dot(self.V.T ** 2, sq_i_mat)
+
+        interaction = np.sum(A - B, 0) if (not sp.issparse(A) and not sp.issparse(B)) else sp.csr_matrix.sum(A - B, 0)
+        interaction /= 2. # (n_item,)
+
+        pred = self.w0 + safe_sparse_dot(self.w, i_mat, dense_output=True) + interaction
 
         scores = np.abs(1. - (pred[:self.n_item] + np.sum(pred[self.n_item:])))
 
@@ -145,10 +157,31 @@ class IncrementalFMs:
         return recos
 
     def __create_i_mat(self, d):
-        mat = np.zeros((self.n_user, self.n_item))
-        u_index = d['u_index']
-        mat[u_index, :] = 1
-        mat = np.vstack((mat, np.identity(self.n_item)))
-        if 'dt' in self.contexts: mat = np.vstack((mat, np.ones(self.n_item) * d['dt']))
-        return mat
+        # (n_user, n_item); user of d's row has 1s
+        row_upper = np.ones(self.n_item) * d['u_index']
+        col_upper = np.arange(self.n_item)
+        data_upper = np.ones(self.n_item)
 
+        # (n_item, n_item); identity matrix
+        row_lower = np.arange(self.n_user, self.n_user + self.n_item)
+        col_lower = np.arange(self.n_item)
+        data_lower = np.ones(self.n_item)
+
+        # concat
+        row = np.append(row_upper, row_lower)
+        col = np.append(col_upper, col_lower)
+        data = np.append(data_upper, data_lower)
+
+        # for each context, extend the cancatenated arrays
+        for ctx_index in xrange(self.n_context):
+            ctx = self.contexts[ctx_index]
+
+            row_ctx = np.ones(self.n_item) * (self.n_user + self.n_item + ctx_index)
+            col_ctx = np.arange(self.n_item)
+            data_ctx = np.ones(self.n_item) * d[ctx]
+
+            row = np.append(row, row_ctx)
+            col = np.append(col, col_ctx)
+            data = np.append(data, data_ctx)
+
+        return sp.csr_matrix((data, (row, col)), shape=(self.p, self.n_item))
