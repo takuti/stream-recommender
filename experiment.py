@@ -137,7 +137,7 @@ class Runner:
 
 def save(path, avgs, time):
     with open(path, 'w') as f:
-        f.write('\n'.join(map(str, [time] + avgs)))
+        f.write('\n'.join(map(str, np.append(time, avgs))))
 
 import click
 

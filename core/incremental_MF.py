@@ -3,16 +3,16 @@ from base import Base
 import numpy as np
 
 class IncrementalMF(Base):
-    """Incremental Matrix Factorization with Positive-Only Feedback
+    """Incremental Matrix Factorization
     """
 
     def __init__(self, n_user, n_item, batch_flg=False, k=100, l2_reg=.01, learn_rate=.03):
         self.n_user = n_user
         self.n_item = n_item
 
+        # if True, parameters will not be updated in evaluation
         self.batch_flg = batch_flg
 
-        # parameter settings
         self.k = k
         self.l2_reg_u = l2_reg
         self.l2_reg_i = l2_reg
@@ -45,11 +45,9 @@ class IncrementalMF(Base):
         self.Q[i_index] = next_i_vec
 
     def _Base__recommend(self, d, at=10):
-        """
-        Recommend Top-N items for the user u
-        """
+        u_index = d['u_index']
 
-        pred = np.dot(np.array([self.P[ d['u_index'] ]]), self.Q.T)
+        pred = np.dot(self.P[u_index], self.Q.T)
         scores = np.abs(1. - pred.reshape(self.n_item))
 
-        return self._Base__scores2recos(d['u_index'], scores, at)
+        return self._Base__scores2recos(u_index, scores, at)
