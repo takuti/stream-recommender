@@ -28,12 +28,12 @@ class Runner:
             float: average time to recommend/update for one sample.
 
         """
-        model = IncrementalMF(self.n_user, self.n_item)
+        model = IncrementalMF(self.n_user, self.n_item, batch_flg)
 
         # pre-train
         model.fit(self.samples[:self.n_train])
 
-        return model.evaluate(self.samples[self.n_train:], batch_flg)
+        return model.evaluate(self.samples[self.n_train:])
 
     def biased_iMF(self):
         """Biased Incremental Matrix Factorizaton

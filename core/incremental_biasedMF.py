@@ -1,9 +1,9 @@
-import time
+from base import Base
+
 import numpy as np
 
-class IncrementalBiasedMF:
-    """
-    Incremental Biased-MF as one specific case of Factorization Machines
+class IncrementalBiasedMF(Base):
+    """Incremental Biased-MF as one specific case of Factorization Machines
     """
 
     def __init__(self, n_user, n_item, k=100, l2_reg_w0=.01, l2_reg_w=.01, l2_reg_V=.01, learn_rate=.03):
@@ -20,59 +20,21 @@ class IncrementalBiasedMF:
 
         self.p = n_user + n_item
 
-        self.__clear()
+        self._Base__clear()
 
-    def fit(self, train_samples):
-        self.__clear()
-        for d in train_samples:
-            self.__update(d['u_index'], d['i_index'])
-
-    def evaluate(self, test_samples, window_size=5000):
-        total_time = 0.
-        recalls = [0] * window_size
-        avgs = []
-
-        for i, d in enumerate(test_samples):
-            u_index = d['u_index']
-            i_index = d['i_index']
-
-            ### start timer
-            start = time.clock()
-
-            # 1.
-            if 1 in self.observed[u_index, :]:
-                # If u is a known user, use the current model to recommend N items,
-                recos = self.__recommend(u_index)
-
-                # 2. Score the recommendation list given the true observed item i
-                recall = 1 if (i_index in recos) else 0
-
-                recalls[i % window_size] = recall
-                s = float(sum(recalls))
-                avg = s / window_size if (i + 1 >= window_size) else s / (i + 1)
-                avgs.append(avg)
-            else:
-                avgs.append(avgs[-1])
-
-            # 3. update the model with the observed event
-            self.__update(u_index, i_index)
-
-            ### stop timer
-            total_time += (time.clock() - start)
-
-        return avgs, total_time / float(len(test_samples))
-
-    def __clear(self):
+    def _Base__clear(self):
         self.observed = np.zeros((self.n_user, self.n_item))
         self.w0 = 0.
         self.w = np.zeros(self.p)
         self.V = np.random.normal(0., 0.1, (self.p, self.k))
         self.prev_w0 = self.prev_w = float('inf')
 
-    def __update(self, u_index, i_index):
+    def _Base__update(self, d):
         """
         Update the model parameters based on the given vector-value pair.
         """
+        u_index = d['u_index']
+        i_index = d['i_index']
 
         self.observed[u_index, i_index] = 1
 
@@ -102,21 +64,11 @@ class IncrementalBiasedMF:
         self.V[u] = next_u_vec
         self.V[i] = next_i_vec
 
-    def __recommend(self, u_index, at=10):
-
-        recos = []
+    def _Base__recommend(self, d, at=10):
 
         i_offset = self.n_user
 
-        pred = np.dot(np.array([self.V[u_index]]), self.V[i_offset:].T) + self.w0 + self.w[u_index] + np.array([self.w[i_offset:]])
+        pred = np.dot(np.array([self.V[ d['u_index'] ]]), self.V[i_offset:].T) + self.w0 + self.w[ d['u_index'] ] + np.array([self.w[i_offset:]])
         scores = np.abs(1. - pred.reshape(self.n_item))
 
-        cnt = 0
-        for i_index in np.argsort(scores):
-            if self.observed[u_index, i_index] == 1: continue
-            recos.append(i_index)
-            cnt += 1
-            if cnt == at: break
-
-        return recos
-
+        return self._Base__scores2recos(d['u_index'], scores, at)

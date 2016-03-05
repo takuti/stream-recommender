@@ -1,11 +1,11 @@
-import time
+from base import Base
+
 import numpy as np
 import scipy.sparse as sp
 from sklearn.utils.extmath import safe_sparse_dot
 
-class IncrementalFMs:
-    """
-    Incremental Factorization Machines
+class IncrementalFMs(Base):
+    """Incremental Factorization Machines
     """
 
     def __init__(self, n_user, n_item, contexts, k=100, l2_reg_w0=.01, l2_reg_w=.01, l2_reg_V=.01, learn_rate=.03):
@@ -26,58 +26,18 @@ class IncrementalFMs:
         self.l2_reg_V = l2_reg_V
         self.learn_rate = learn_rate
 
-        self.__clear()
+        self._Base__clear()
 
-    def fit(self, train_samples):
-        self.__clear()
-        for d in train_samples:
-            self.__update(d)
-
-    def evaluate(self, test_samples, window_size=5000):
-        total_time = 0.
-        recalls = [0] * window_size
-        avgs = []
-
-        for i, d in enumerate(test_samples):
-            u_index = d['u_index']
-            i_index = d['i_index']
-
-            ### start timer
-            start = time.clock()
-
-            # 1.
-            if 1 in self.observed[u_index, :]:
-                # If u is a known user, use the current model to recommend N items,
-                recos = self.__recommend(u_index, self.__create_i_mat(d))
-
-                # 2. Score the recommendation list given the true observed item i
-                recall = 1 if (i_index in recos) else 0
-
-                recalls[i % window_size] = recall
-                s = float(sum(recalls))
-                avg = s / window_size if (i + 1 >= window_size) else s / (i + 1)
-                avgs.append(avg)
-            else:
-                avgs.append(avgs[-1])
-
-            # 3. update the model with the observed event
-            self.__update(d)
-
-            ### stop timer
-            total_time += (time.clock() - start)
-
-        return avgs, total_time / float(len(test_samples))
-
-    def __clear(self):
+    def _Base__clear(self):
         self.observed = np.zeros((self.n_user, self.n_item))
         self.w0 = 0.
         self.w = np.zeros(self.p)
         self.V = np.random.normal(0., 0.1, (self.p, self.k))
-        self.prev_w0 = self.prev_w = float('inf')
+        self.prev_w0 = float('inf')
+        self.prev_w = np.array([])
 
-    def __update(self, d):
-        """
-        Update the model parameters based on the given vector-value pair.
+    def _Base__update(self, d):
+        """Update the model parameters based on the given vector-value pair.
         """
 
         u_index = d['u_index']
@@ -95,13 +55,10 @@ class IncrementalFMs:
         interaction = np.sum(np.dot(self.V.T, x_vec) ** 2 - np.dot(self.V.T ** 2, x_vec ** 2)) / 2.
         pred = self.w0 + np.inner(self.w, x) + interaction
 
-        #u = u_index
-        #i = self.n_user + i_index
-        #pred = np.inner(self.V[u], self.V[i]) + self.w0 + self.w[u] + self.w[i]
         err = 1. - pred
 
         # Updating regularization parameters
-        if self.prev_w0 != float('inf'):
+        if self.prev_w0 != float('inf') and self.prev_w.size != 0:
             self.l2_reg_w0 = max(0., self.l2_reg_w0 + 4. * self.learn_rate * (err * self.learn_rate * self.prev_w0))
             self.l2_reg_w = max(0., self.l2_reg_w + 4. * self.learn_rate * (err * self.learn_rate * np.inner(x, self.prev_w)))
 
@@ -124,37 +81,25 @@ class IncrementalFMs:
             g = err * x[pi] * (np.dot(np.array([x]), prev_V) - x[pi] * prev_V[pi])
             self.V[pi] = prev_V[pi] + 2. * self.learn_rate * (g - self.l2_reg_V * prev_V[pi])
 
-    def __recommend(self, u_index, i_mat, at=10):
-        recos = []
+    def _Base__recommend(self, d, at=10):
+        # i_mat is (p, n_item) for all possible pairs of the user (d['u_index']) and all items
+        i_mat = self.__create_i_mat(d)
 
-        i_offset = self.n_user
-
-        # i_mat is (p, n_item) for all possible pairs of the user (u_index) and all items
+        # Matrix A and B should be dense (numpy array; rather than scipy CSR matrix) because V is dense.
         A = safe_sparse_dot(self.V.T, i_mat)
-        if sp.issparse(A):
-            A.data[:] = A.data ** 2
-        else:
-            A = A ** 2
+        A = A ** 2
 
         sq_i_mat = i_mat.copy()
         sq_i_mat.data[:] = sq_i_mat.data ** 2
         B = safe_sparse_dot(self.V.T ** 2, sq_i_mat)
 
-        interaction = np.sum(A - B, 0) if (not sp.issparse(A) and not sp.issparse(B)) else sp.csr_matrix.sum(A - B, 0)
+        interaction = np.sum(A - B, 0)
         interaction /= 2. # (n_item,)
 
         pred = self.w0 + safe_sparse_dot(self.w, i_mat, dense_output=True) + interaction
 
         scores = np.abs(1. - (pred[:self.n_item] + np.sum(pred[self.n_item:])))
-
-        cnt = 0
-        for i_index in np.argsort(scores):
-            if self.observed[u_index, i_index] == 1: continue
-            recos.append(i_index)
-            cnt += 1
-            if cnt == at: break
-
-        return recos
+        return self._Base__scores2recos(d['u_index'], scores, at)
 
     def __create_i_mat(self, d):
         # (n_user, n_item); user of d's row has 1s
