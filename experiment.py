@@ -12,7 +12,10 @@ from core.incremental_FMs import IncrementalFMs
 PATH_TO_RATINGS = '../../data/ml-1m/ratings.dat'
 
 class Runner:
-    def __init__(self):
+    def __init__(self, limit=200000):
+        # number of test samples
+        self.limit = limit
+
         self.__prepare()
 
     def iMF(self, batch_flg=False):
@@ -33,7 +36,7 @@ class Runner:
         # pre-train
         model.fit(self.samples[:self.n_train])
 
-        return model.evaluate(self.samples[self.n_train:])
+        return model.evaluate(self.samples[self.n_train:self.n_train+self.n_test])
 
     def biased_iMF(self):
         """Biased Incremental Matrix Factorizaton
@@ -45,7 +48,7 @@ class Runner:
         """
         model = IncrementalBiasedMF(self.n_user, self.n_item)
         model.fit(self.samples[:self.n_train])
-        return model.evaluate(self.samples[self.n_train:])
+        return model.evaluate(self.samples[self.n_train:self.n_train+self.n_test])
 
     def iFMs(self, contexts=[]):
         """Incremental Factorization Machines
@@ -61,7 +64,7 @@ class Runner:
         """
         model = IncrementalFMs(self.n_user, self.n_item, contexts)
         model.fit(self.samples[:self.n_train])
-        return model.evaluate(self.samples[self.n_train:])
+        return model.evaluate(self.samples[self.n_train:self.n_train+self.n_test])
 
     def __prepare(self):
         """Create a list of samples and count number of users/items.
@@ -99,6 +102,7 @@ class Runner:
         self.n_item = len(item_ids)
         self.n_sample = len(self.samples)
         self.n_train = int(self.n_sample * 0.2) # 20% for pre-training to avoid cold-start
+        self.n_test = min(self.n_sample-self.n_train, self.limit)
 
     def __load_ratings(self):
         """Load all "positive" samples in the MovieLens 1M dataset.
@@ -145,8 +149,9 @@ models = ['baseline', 'iMF', 'biased-iMF', 'iFMs', 'iFMs-time-aware', 'all_MF']
 
 @click.command()
 @click.option('--model', type=click.Choice(models), default=models[0], help='Choose a factorization model')
-def cli(model):
-    exp = Runner()
+@click.option('--limit', default=200000, help='Number of test samples for evaluation')
+def cli(model, limit):
+    exp = Runner(limit)
 
     if model == 'all_MF':
         avgs, time = exp.iMF(batch_flg=True)

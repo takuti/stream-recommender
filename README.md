@@ -16,4 +16,6 @@ Takuya Kitazawa. **Incremental Factorization Machines for Item Recommendation in
 - **iFMs-time-aware:** time-awared incremental factorization machines *(proposed)*
 - **all_MF:** run **baseline**, **iMF** and **biased-iMF** at once
 
+In addition, if you like to restrict number of test samples, `--limit` option is available.
+
 The results will be written text files under *results/*.
