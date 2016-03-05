@@ -18,11 +18,11 @@ class Runner:
 
         self.__prepare()
 
-    def iMF(self, batch_flg=False):
+    def iMF(self, static_flg=False):
         """Incremental Matrix Factorization
 
         Args:
-            batch_flg (bool): choose whether a model is incrementally updated.
+            static_flg (bool): choose whether a model is incrementally updated.
                 True -- baseline
                 False -- incremental matrix factorization
 
@@ -31,7 +31,7 @@ class Runner:
             float: average time to recommend/update for one sample.
 
         """
-        model = IncrementalMF(self.n_user, self.n_item, batch_flg)
+        model = IncrementalMF(self.n_user, self.n_item, static_flg)
 
         # pre-train
         model.fit(self.samples[:self.n_train])
@@ -154,7 +154,7 @@ def cli(model, limit):
     exp = Runner(limit)
 
     if model == 'all_MF':
-        avgs, time = exp.iMF(batch_flg=True)
+        avgs, time = exp.iMF(static_flg=True)
         save('results/baseline.txt', avgs, time)
 
         avgs, time = exp.iMF()
@@ -164,7 +164,7 @@ def cli(model, limit):
         save('results/biased-iMF.txt', avgs, time)
     else:
         if model == 'baseline' or model == 'iMF':
-            avgs, time = exp.iMF(batch_flg=True) if model == 'baseline' else exp.iMF()
+            avgs, time = exp.iMF(static_flg=True) if model == 'baseline' else exp.iMF()
         elif model == 'biased-iMF':
             avgs, time = exp.biased_iMF()
         else:
