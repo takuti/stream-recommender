@@ -8,16 +8,26 @@ class IncrementalFMs(Base):
     """Incremental Factorization Machines
     """
 
-    def __init__(self, n_user, n_item, contexts, k=100, l2_reg_w0=.01, l2_reg_w=.01, l2_reg_V=.01, learn_rate=.03):
+    def __init__(self, n_user, n_item, contexts, k=100, l2_reg_w0=.01, l2_reg_w=.01, l2_reg_V=30., learn_rate=.005):
         self.n_user = n_user
         self.n_item = n_item
-        self.contexts = contexts
-        self.n_context = len(contexts)
+
+        self.contexts = []
 
         self.p = n_user + n_item
-        if 'dt' in contexts: self.p += 1
-        if 'genre' in contexts: self.p += 18 # 18 genres
-        if 'demographics' in contexts: self.p += 23 # 1 for M/F, 1 for age, 21 for occupation(0-20)
+        if 'dt' in contexts:
+            self.contexts.append(('dt', 1))
+            self.p += 1
+        if 'genre' in contexts:
+            # 18 genres
+            self.contexts.append(('genre', 18))
+            self.p += 18
+        if 'demographics' in contexts:
+            # 1 for M/F, 1 for age, 21 for occupation(0-20)
+            self.contexts.append(('demographics', 23))
+            self.p += 23
+
+        self.n_context = len(contexts)
 
         self.k = k
         self.l2_reg_w0 = l2_reg_w0
@@ -45,8 +55,8 @@ class IncrementalFMs(Base):
         x = np.zeros(self.n_user + self.n_item)
         x[u_index] = x[self.n_user + i_index] = 1
 
-        for c in self.contexts:
-            x = np.append(x, d[c])
+        for ctx, dim in self.contexts:
+            x = np.append(x, d[ctx])
 
         x_vec = np.array([x]).T # p x 1
         interaction = np.sum(np.dot(self.V.T, x_vec) ** 2 - np.dot(self.V.T ** 2, x_vec ** 2)) / 2.
@@ -127,15 +137,19 @@ class IncrementalFMs(Base):
         data = np.append(data_upper, data_lower)
 
         # for each context, extend the cancatenated arrays
-        for ctx_index in xrange(self.n_context):
-            ctx = self.contexts[ctx_index]
-
-            row_ctx = np.ones(self.n_item) * (self.n_user + self.n_item + ctx_index)
-            col_ctx = np.arange(self.n_item)
-            data_ctx = np.ones(self.n_item) * d[ctx]
+        ctx_head = 0
+        for ctx, dim in self.contexts:
+            row_ctx = np.array([])
+            data_ctx = np.array([])
+            for di in xrange(dim):
+                row_ctx = np.append(row_ctx, np.ones(self.n_item) * (self.n_user + self.n_item + ctx_head + di))
+                data_ctx = np.append(data_ctx, np.ones(self.n_item) * d[ctx][di])
+            col_ctx = np.tile(np.arange(self.n_item), dim)
 
             row = np.append(row, row_ctx)
             col = np.append(col, col_ctx)
             data = np.append(data, data_ctx)
+
+            ctx_head += dim
 
         return sp.csr_matrix((data, (row, col)), shape=(self.p, self.n_item))
