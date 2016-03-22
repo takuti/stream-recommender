@@ -225,7 +225,7 @@ def save(path, avgs, time):
 
 import click
 
-models = ['baseline', 'iMF', 'biased-iMF', 'iFMs', 'all_MF']
+models = ['baseline', 'iMF', 'biased-iMF', 'iFMs', 'all_MF', 'all_FMs']
 contexts = ['dt', 'genre', 'demographics']
 
 
@@ -245,6 +245,12 @@ def cli(model, context, limit):
 
         avgs, time = exp.biased_iMF()
         save('results/biased-iMF.txt', avgs, time)
+    elif model == 'all_FMs':
+        avgs, time = exp.iFMs(())
+        save('results/iFMs_no_context.txt', avgs, time)
+
+        avgs, time = exp.iFMs(('dt', 'genre', 'demographics'))
+        save('results/iFMs_contexts.txt', avgs, time)
     else:
         if model == 'baseline' or model == 'iMF':
             avgs, time = exp.iMF(static_flg=True) if model == 'baseline' else exp.iMF()
