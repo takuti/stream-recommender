@@ -6,7 +6,7 @@ class IncrementalBiasedMF(Base):
     """Biased Incremental MF as one specific case of factorization machines; no context
     """
 
-    def __init__(self, n_user, n_item, k=100, l2_reg_w0=.01, l2_reg_w=.01, l2_reg_V=.01, learn_rate=.03):
+    def __init__(self, n_user, n_item, k=4, l2_reg_w0=.01, l2_reg_w=.01, l2_reg_V=.01, learn_rate=.03):
         self.n_user = n_user
         self.n_item = n_item
 
