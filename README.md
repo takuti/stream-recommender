@@ -1,21 +1,27 @@
 Incremental Factorization Machines
 ===
 
-Takuya Kitazawa. **Incremental Factorization Machines for Item Recommendation in Data Streams**. In *Proc. of the 30th National Convention of the Japanese Society for Artificial Intelligence*, 1C2-5, June 2016 (to appear). 
+Takuya Kitazawa. **Incremental Factorization Machines for Item Recommendation in Data Streams**. In *Proc. of the 30th National Convention of the Japanese Society for Artificial Intelligence*, 1C2-5, May 2016 (to appear).
 
 ## Usage
 
-	$ python experiment.py --model=MODEL
+	$ python experiment.py
 	
-***MODEL*** can be
+- **--model**: specify a factorization model
+	- **baseline** &mdash; incremental matrix factorization w/o updating
+	- **iMF** &mdash; incremental matrix factorization
+	- **biased-iMF** &mdash; biased incremental matrix factorization
+	- **iFMs** &mdash; incremental factorization machines *(proposed)*
+	- **all_MF** &mdash; run **baseline**, **iMF** and **biased-iMF** at once
+	- **all_FMs** &mdash; run **iFMs** both of *w/o contextual variables* and *w/ all contextual variables*
+- **--context**, **-c**: choose contexts used by iFMs
+	- **dt** &mdash; elapsed days from the initial positive sample
+	- **genre** &mdash; movie genre
+	- **demographics** &mdash; users' demographics
+- **--limit**: restrict number of test samples
 
-- **baseline:** incremental matrix factorization w/o updating
-- **iMF:** incremental matrix factorization
-- **biased-iMF:** biased incremental matrix factorization
-- **iFMs:** incremental factorization machines *(proposed)*
-- **iFMs-context:** context-awared incremental factorization machines *(proposed)*
-- **all_MF:** run **baseline**, **iMF** and **biased-iMF** at once
+Sample:
 
-In addition, if you like to restrict number of test samples, `--limit` option is available.
+	$ python experiment.py --model=iFMs -c genre -c dt -c demographics
 
 The results will be written text files under *results/*.
