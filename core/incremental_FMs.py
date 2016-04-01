@@ -4,7 +4,9 @@ import numpy as np
 import scipy.sparse as sp
 from sklearn.utils.extmath import safe_sparse_dot
 
+
 class IncrementalFMs(Base):
+
     """Incremental Factorization Machines
     """
 
@@ -58,7 +60,7 @@ class IncrementalFMs(Base):
         for ctx, dim in self.contexts:
             x = np.append(x, d[ctx])
 
-        x_vec = np.array([x]).T # p x 1
+        x_vec = np.array([x]).T  # p x 1
         interaction = np.sum(np.dot(self.V.T, x_vec) ** 2 - np.dot(self.V.T ** 2, x_vec ** 2)) / 2.
         pred = self.w0 + np.inner(self.w, x) + interaction
 
@@ -84,7 +86,8 @@ class IncrementalFMs(Base):
 
         # update w and V
         for pi in xrange(self.p):
-            if x[pi] == 0.: continue
+            if x[pi] == 0.:
+                continue
 
             self.w[pi] = self.prev_w[pi] + 2. * self.learn_rate * (err * x[pi] - self.l2_reg_w * self.prev_w[pi])
 
@@ -104,7 +107,7 @@ class IncrementalFMs(Base):
         B = safe_sparse_dot(self.V.T ** 2, sq_i_mat)
 
         interaction = np.sum(A - B, 0)
-        interaction /= 2. # (n_item,)
+        interaction /= 2.  # (n_item,)
 
         pred = self.w0 + safe_sparse_dot(self.w, i_mat, dense_output=True) + interaction
         scores = np.abs(1. - (pred[:self.n_item] + np.sum(pred[self.n_item:])))

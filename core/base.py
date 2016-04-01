@@ -3,7 +3,9 @@ from abc import ABCMeta, abstractmethod
 import time
 import numpy as np
 
+
 class Base:
+
     """Base class for experimentation of the incremental models with positive-only feedback.
 
     """
@@ -59,7 +61,7 @@ class Base:
         avgs = np.zeros(n_test)
         latest_avg = 0.
 
-        ### start timer
+        # start timer
         start = time.clock()
 
         for i, d in enumerate(test_samples):
@@ -78,7 +80,7 @@ class Base:
                 window[wi] = new_recall
 
                 sum_window = sum_window - old_recall + new_recall
-                latest_avg = sum_window / min(i+1, window_size)
+                latest_avg = sum_window / min(i + 1, window_size)
 
             # save the latest average
             # if u is unobserved user, avg of this step will be same as the previous avg
@@ -87,7 +89,7 @@ class Base:
             # Step 2: update the model with the observed event
             self.__update(d)
 
-        ### stop timer
+        # stop timer
         avg_time = (time.clock() - start) / n_test
 
         return avgs, avg_time
@@ -147,8 +149,10 @@ class Base:
         recos = np.array([])
         for i_index in np.argsort(scores):
             # already observed <user, item> pair is NOT recommended
-            if self.observed[u_index, i_index] == 1: continue
+            if self.observed[u_index, i_index] == 1:
+                continue
 
             recos = np.append(recos, i_index)
-            if recos.size == at: break
+            if recos.size == at:
+                break
         return recos

@@ -2,7 +2,9 @@ from base import Base
 
 import numpy as np
 
+
 class IncrementalBiasedMF(Base):
+
     """Biased Incremental MF as one specific case of factorization machines; no context
     """
 

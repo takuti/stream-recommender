@@ -2,7 +2,9 @@ from base import Base
 
 import numpy as np
 
+
 class IncrementalMF(Base):
+
     """Incremental Matrix Factorization
     """
 
@@ -32,7 +34,8 @@ class IncrementalMF(Base):
         self.observed[u_index, i_index] = 1
 
         # static baseline; w/o updating the model
-        if self.static_flg: return
+        if self.static_flg:
+            return
 
         u_vec = self.P[u_index]
         i_vec = self.Q[i_index]
