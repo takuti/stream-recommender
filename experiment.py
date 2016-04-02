@@ -16,7 +16,9 @@ PATH_TO_USERS = '../../data/ml-1m/users.dat'
 
 class Runner:
 
-    def __init__(self, limit=200000):
+    def __init__(self, method='SMA', limit=200000):
+        self.method = method
+
         # number of test samples
         self.limit = limit
 
@@ -40,7 +42,10 @@ class Runner:
         # pre-train
         model.fit(self.samples[:self.n_train])
 
-        return model.evaluate(self.samples[self.n_train:self.n_train + self.n_test])
+        if self.method == 'SMA':
+            return model.evaluate_SMA(self.samples[self.n_train:self.n_train + self.n_test])
+        elif self.method == 'recall':
+            return model.evaluate_recall(self.samples[self.n_train:self.n_train + self.n_test])
 
     def biased_iMF(self):
         """Biased Incremental Matrix Factorizaton
@@ -52,7 +57,11 @@ class Runner:
         """
         model = IncrementalBiasedMF(self.n_user, self.n_item)
         model.fit(self.samples[:self.n_train])
-        return model.evaluate(self.samples[self.n_train:self.n_train + self.n_test])
+
+        if self.method == 'SMA':
+            return model.evaluate_SMA(self.samples[self.n_train:self.n_train + self.n_test])
+        elif self.method == 'recall':
+            return model.evaluate_recall(self.samples[self.n_train:self.n_train + self.n_test])
 
     def iFMs(self, contexts=()):
         """Incremental Factorization Machines
@@ -70,9 +79,15 @@ class Runner:
         """
         model = IncrementalFMs(self.n_user, self.n_item, contexts)
         model.fit(self.samples[:self.n_train])
-        res = model.evaluate(self.samples[self.n_train:self.n_train + self.n_test])
+
+        if self.method == 'SMA':
+            res = model.evaluate_SMA(self.samples[self.n_train:self.n_train + self.n_test])
+        elif self.method == 'recall':
+            res = model.evaluate_recall(self.samples[self.n_train:self.n_train + self.n_test])
+
         # print auto-updated regularization params
         print model.l2_reg_w0, model.l2_reg_w, model.l2_reg_V
+
         return res
 
     def __prepare(self):
@@ -118,7 +133,7 @@ class Runner:
         self.n_user = len(user_ids)
         self.n_item = len(item_ids)
         self.n_sample = len(self.samples)
-        self.n_train = int(self.n_sample * 0.2)  # 20% for pre-training to avoid cold-start
+        self.n_train = int(self.n_sample * 0.3)  # 30% for pre-training to avoid cold-start
         self.n_test = min(self.n_sample - self.n_train, self.limit)
 
     def __load_movies(self):
@@ -225,32 +240,34 @@ def save(path, avgs, time):
 
 import click
 
+methods = ['SMA', 'recall']
 models = ['baseline', 'iMF', 'biased-iMF', 'iFMs', 'all_MF', 'all_FMs']
 contexts = ['dt', 'genre', 'demographics']
 
 
 @click.command()
+@click.option('--method', type=click.Choice(methods), default=methods[0], help='Choose an evaluation methodology.')
 @click.option('--model', type=click.Choice(models), default=models[0], help='Choose a factorization model')
 @click.option('--context', '-c', type=click.Choice(contexts), multiple=True, help='Choose contexts used by iFMs')
 @click.option('--limit', default=200000, help='Number of test samples for evaluation')
-def cli(model, context, limit):
-    exp = Runner(limit)
+def cli(method, model, context, limit):
+    exp = Runner(method=method, limit=limit)
 
     if model == 'all_MF':
         avgs, time = exp.iMF(static_flg=True)
-        save('results/baseline.txt', avgs, time)
+        save('results/baseline_' + method + '.txt', avgs, time)
 
         avgs, time = exp.iMF()
-        save('results/iMF.txt', avgs, time)
+        save('results/iMF_' + method + '.txt', avgs, time)
 
         avgs, time = exp.biased_iMF()
-        save('results/biased-iMF.txt', avgs, time)
+        save('results/biased-iMF_' + method + '.txt', avgs, time)
     elif model == 'all_FMs':
         avgs, time = exp.iFMs(())
-        save('results/iFMs_no_context.txt', avgs, time)
+        save('results/iFMs_no_context_' + method + '.txt', avgs, time)
 
         avgs, time = exp.iFMs(('dt', 'genre', 'demographics'))
-        save('results/iFMs_contexts.txt', avgs, time)
+        save('results/iFMs_contexts_' + method + '.txt', avgs, time)
     else:
         if model == 'baseline' or model == 'iMF':
             avgs, time = exp.iMF(static_flg=True) if model == 'baseline' else exp.iMF()
@@ -260,7 +277,7 @@ def cli(model, context, limit):
             model = model + '_' + '-'.join(context)  # update output filename depending on contexts
             avgs, time = exp.iFMs(context)
 
-        save('results/%s.txt' % model, avgs, time)
+        save('results/%s_' + method + '.txt' % model, avgs, time)
 
 if __name__ == '__main__':
     cli()

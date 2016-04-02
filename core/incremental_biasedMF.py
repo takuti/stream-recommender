@@ -8,7 +8,7 @@ class IncrementalBiasedMF(Base):
     """Biased Incremental MF as one specific case of factorization machines; no context
     """
 
-    def __init__(self, n_user, n_item, k=4, l2_reg_w0=.01, l2_reg_w=.01, l2_reg_V=.01, learn_rate=.03):
+    def __init__(self, n_user, n_item, k=40, l2_reg_w0=.01, l2_reg_w=.01, l2_reg_V=.01, learn_rate=.03):
         self.n_user = n_user
         self.n_item = n_item
 
@@ -33,8 +33,6 @@ class IncrementalBiasedMF(Base):
     def _Base__update(self, d):
         u_index = d['u_index']
         i_index = d['i_index']
-
-        self.observed[u_index, i_index] = 1
 
         u = u_index
         i = self.n_user + i_index
@@ -64,11 +62,11 @@ class IncrementalBiasedMF(Base):
         self.V[u] = next_u_vec
         self.V[i] = next_i_vec
 
-    def _Base__recommend(self, d, at=10):
+    def _Base__recommend(self, d, target_i_indices, at=10):
         u_index = d['u_index']
         i_offset = self.n_user
 
         pred = np.dot(self.V[u_index], self.V[i_offset:].T) + self.w0 + self.w[u_index] + self.w[i_offset:]
         scores = np.abs(1. - pred.reshape(self.n_item))
 
-        return self._Base__scores2recos(u_index, scores, at)
+        return self._Base__scores2recos(u_index, scores, target_i_indices, at)

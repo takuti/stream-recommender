@@ -8,7 +8,7 @@ class IncrementalMF(Base):
     """Incremental Matrix Factorization
     """
 
-    def __init__(self, n_user, n_item, static_flg=False, k=4, l2_reg=.01, learn_rate=.03):
+    def __init__(self, n_user, n_item, static_flg=False, k=40, l2_reg=.01, learn_rate=.03):
         self.n_user = n_user
         self.n_item = n_item
 
@@ -28,14 +28,12 @@ class IncrementalMF(Base):
         self.Q = np.random.normal(0., 0.1, (self.n_item, self.k))
 
     def _Base__update(self, d):
-        u_index = d['u_index']
-        i_index = d['i_index']
-
-        self.observed[u_index, i_index] = 1
-
         # static baseline; w/o updating the model
         if self.static_flg:
             return
+
+        u_index = d['u_index']
+        i_index = d['i_index']
 
         u_vec = self.P[u_index]
         i_vec = self.Q[i_index]
@@ -47,10 +45,10 @@ class IncrementalMF(Base):
         self.P[u_index] = next_u_vec
         self.Q[i_index] = next_i_vec
 
-    def _Base__recommend(self, d, at=10):
+    def _Base__recommend(self, d, target_i_indices, at=10):
         u_index = d['u_index']
 
         pred = np.dot(self.P[u_index], self.Q.T)
         scores = np.abs(1. - pred.reshape(self.n_item))
 
-        return self._Base__scores2recos(u_index, scores, at)
+        return self._Base__scores2recos(u_index, scores, target_i_indices, at)

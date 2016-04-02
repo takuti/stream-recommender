@@ -38,9 +38,13 @@ class Base:
         """
         self.__clear()
         for d in train_samples:
+            u_index = d['u_index']
+            i_index = d['i_index']
+            self.observed[u_index, i_index] = 1
+
             self.__update(d)
 
-    def evaluate(self, test_samples, window_size=5000, at=10):
+    def evaluate_SMA(self, test_samples, window_size=5000, at=10):
         """Iterate recommend/update procedure and compute Simple Moving Averages (SMAs).
 
         Args:
@@ -70,7 +74,8 @@ class Base:
 
             # Step 1: if u is a known user, recommend items using current model
             if 1 in self.observed[u_index, :]:
-                recos = self.__recommend(d, at)
+                # make recommendation for all items
+                recos = self.__recommend(d, np.arange(self.n_item), at)
 
                 # score the recommendation list based on the true observed item
                 wi = i % window_size
@@ -81,6 +86,8 @@ class Base:
 
                 sum_window = sum_window - old_recall + new_recall
                 latest_avg = sum_window / min(i + 1, window_size)
+
+            self.observed[u_index, i_index] = 1
 
             # save the latest average
             # if u is unobserved user, avg of this step will be same as the previous avg
@@ -93,6 +100,52 @@ class Base:
         avg_time = (time.clock() - start) / n_test
 
         return avgs, avg_time
+
+    def evaluate_recall(self, test_samples, at=10):
+        """Iterate recommend/update procedure and compute incremental recall.
+
+        Args:
+            test_samples (list of dict): Positive test samples.
+            at (int): Top-{at} items will be recommended in each iteration.
+
+        Returns:
+            float: Avg. incremental recall@{at}.
+            float: Avg. recommend+update time in second.
+
+        """
+        n_test = len(test_samples)
+
+        # start timer
+        start = time.clock()
+
+        n_hit = 0
+
+        for i, d in enumerate(test_samples):
+            u_index = d['u_index']
+            i_index = d['i_index']
+
+            self.observed[u_index, i_index] = 0
+
+            # 1000 further unobserved items + item i interacted by user u
+            unobserved_i_indices = np.where(self.observed[u_index, :] == 0)[0]
+            target_i_indices = np.random.choice(unobserved_i_indices, 1000, replace=False)
+
+            # make top-{at} recommendation for the 1001 items
+            recos = self.__recommend(d, target_i_indices, at)
+
+            self.observed[u_index, i_index] = 1
+
+            # increment a hit counter if i_index is in the top-{at} recommendation list
+            if i_index in recos:
+                n_hit += 1
+
+            # Step 2: update the model with the observed event
+            self.__update(d)
+
+        # stop timer
+        avg_time = (time.clock() - start) / n_test
+
+        return float(n_hit) / n_test, avg_time
 
     @abstractmethod
     def __clear(self):
@@ -118,7 +171,7 @@ class Base:
         pass
 
     @abstractmethod
-    def __recommend(self, d, at):
+    def __recommend(self, d, target_i_indices, at):
         """Recommend top-{at} items for a user represented as a dictionary d.
 
         First, scores are computed.
@@ -126,6 +179,7 @@ class Base:
 
         Args:
             d (dict): A dictionary which has data of a sample.
+            target_i_indices (numpy array; (# target items, )): Target items' indices. Only these items are considered as the recommendation candidates.
             at (int): Top-{at} items will be recommended.
 
         Returns:
@@ -134,12 +188,13 @@ class Base:
         """
         return
 
-    def __scores2recos(self, u_index, scores, at):
+    def __scores2recos(self, u_index, scores, target_i_indices, at):
         """Get top-{at} recommendation list for a user u_index based on scores.
 
         Args:
             u_index (int): Target user's index.
             scores (numpy array; (n_item,)): Scores for every items. Smaller score indicates a promising item.
+            target_i_indices (numpy array; (# target items, )): Target items' indices. Only these items are considered as the recommendation candidates.
             at (int): Top-{at} items will be recommended.
 
         Returns:
@@ -147,7 +202,8 @@ class Base:
 
         """
         recos = np.array([])
-        for i_index in np.argsort(scores):
+        target_scores = scores[target_i_indices]
+        for i_index in target_i_indices[np.argsort(target_scores)]:
             # already observed <user, item> pair is NOT recommended
             if self.observed[u_index, i_index] == 1:
                 continue
@@ -155,4 +211,5 @@ class Base:
             recos = np.append(recos, i_index)
             if recos.size == at:
                 break
-        return recos
+
+        return recos.astype(int)
