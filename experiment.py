@@ -40,12 +40,13 @@ class Runner:
         model = IncrementalMF(self.n_user, self.n_item, static_flg)
 
         # pre-train
-        model.fit(self.samples[:self.n_train])
+        batch_tail = self.n_batch_train + self.n_batch_test
+        model.fit(self.samples[:self.n_batch_train], self.samples[self.n_batch_train:batch_tail])
 
         if self.method == 'SMA':
-            return model.evaluate_SMA(self.samples[self.n_train:self.n_train + self.n_test])
+            return model.evaluate_SMA(self.samples[batch_tail:batch_tail + self.n_test])
         elif self.method == 'recall':
-            return model.evaluate_recall(self.samples[self.n_train:self.n_train + self.n_test])
+            return model.evaluate_recall(self.samples[batch_tail:batch_tail + self.n_test])
 
     def biased_iMF(self):
         """Biased Incremental Matrix Factorizaton
@@ -56,12 +57,14 @@ class Runner:
 
         """
         model = IncrementalBiasedMF(self.n_user, self.n_item)
-        model.fit(self.samples[:self.n_train])
+
+        batch_tail = self.n_batch_train + self.n_batch_test
+        model.fit(self.samples[:self.n_batch_train], self.samples[self.n_batch_train:batch_tail])
 
         if self.method == 'SMA':
-            return model.evaluate_SMA(self.samples[self.n_train:self.n_train + self.n_test])
+            return model.evaluate_SMA(self.samples[batch_tail:batch_tail + self.n_test])
         elif self.method == 'recall':
-            return model.evaluate_recall(self.samples[self.n_train:self.n_train + self.n_test])
+            return model.evaluate_recall(self.samples[batch_tail:batch_tail + self.n_test])
 
     def iFMs(self, contexts=()):
         """Incremental Factorization Machines
@@ -78,12 +81,14 @@ class Runner:
 
         """
         model = IncrementalFMs(self.n_user, self.n_item, contexts)
-        model.fit(self.samples[:self.n_train])
+
+        batch_tail = self.n_batch_train + self.n_batch_test
+        model.fit(self.samples[:self.n_batch_train], self.samples[self.n_batch_train:batch_tail])
 
         if self.method == 'SMA':
-            res = model.evaluate_SMA(self.samples[self.n_train:self.n_train + self.n_test])
+            res = model.evaluate_SMA(self.samples[batch_tail:batch_tail + self.n_test])
         elif self.method == 'recall':
-            res = model.evaluate_recall(self.samples[self.n_train:self.n_train + self.n_test])
+            res = model.evaluate_recall(self.samples[batch_tail:batch_tail + self.n_test])
 
         # print auto-updated regularization params
         print model.l2_reg_w0, model.l2_reg_w, model.l2_reg_V
@@ -133,8 +138,9 @@ class Runner:
         self.n_user = len(user_ids)
         self.n_item = len(item_ids)
         self.n_sample = len(self.samples)
-        self.n_train = int(self.n_sample * 0.3)  # 30% for pre-training to avoid cold-start
-        self.n_test = min(self.n_sample - self.n_train, self.limit)
+        self.n_batch_train = int(self.n_sample * 0.3)  # 30% for pre-training to avoid cold-start
+        self.n_batch_test = int(self.n_sample * 0.2)  # 20% for evaluation of pre-training
+        self.n_test = min(self.n_sample - (self.n_batch_train + self.n_batch_test), self.limit)
 
     def __load_movies(self):
         """Load movie genres as a context.
@@ -277,7 +283,7 @@ def cli(method, model, context, limit):
             model = model + '_' + '-'.join(context)  # update output filename depending on contexts
             avgs, time = exp.iFMs(context)
 
-        save('results/%s_' + method + '.txt' % model, avgs, time)
+        save('results/%s_%s.txt' % (model, method), avgs, time)
 
 if __name__ == '__main__':
     cli()

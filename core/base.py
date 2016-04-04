@@ -29,20 +29,77 @@ class Base:
         # initialize models
         self.__clear()
 
-    def fit(self, train_samples):
-        """Train a model using the first 20% positive samples to avoid cold-start.
+    def fit(self, train_samples, test_samples, at=10):
+        """Train a model using the first 30% positive samples to avoid cold-start.
+
+        Evaluation of this batch training is done by using the next 20% positive samples.
+        After the batch SGD training, the models are incrementally updated by using the 20% test samples.
 
         Args:
-            train_samples (list of dict): Positive training samples.
+            train_samples (list of dict): Positive training samples (0-30%).
+            test_sample (list of dict): Test samples (30-50%).
+            at (int): Evaluation metric of this batch pre-training will be recall@{at}.
 
         """
         self.__clear()
-        for d in train_samples:
+
+        self.n_epoch = 0
+        prev_recall = 0.
+
+        while True:
+            # SGD requires us to shuffle samples in each iteration
+            np.random.shuffle(train_samples)
+
+            # number of epochs will be used by the forgetting methods
+            self.n_epoch += 1
+
+            # 20%: update models
+            for d in train_samples:
+                u_index = d['u_index']
+                i_index = d['i_index']
+                self.observed[u_index, i_index] = 1
+
+                self.__update(d, is_batch_train=True)
+
+            # 30%: evaluate the current model
+            recall = self.batch_evaluate(test_samples, at)
+
+            # batch training is converged
+            if recall < prev_recall:
+                break
+
+            prev_recall = recall
+
+        # for further incremental evaluation,
+        # the model is incrementally updated by using the 20% samples
+        for d in test_samples:
             u_index = d['u_index']
             i_index = d['i_index']
             self.observed[u_index, i_index] = 1
 
             self.__update(d)
+
+    def batch_evaluate(self, test_samples, at):
+        """Evaluate the current model by using the given test samples.
+
+        Args:
+            test_samples (list of dict): Current model is evaluated by these samples.
+            at (int): Evaluation metric is recall@{at}.
+                    For each sample,
+                        top-{at} recommendation list has a true item -> TP++
+
+        """
+        n_tp = 0
+
+        for i, d in enumerate(test_samples):
+            # make recommendation for all items
+            recos = self.__recommend(d, np.arange(self.n_item), at)
+
+            # is a true sample in the top-{at} recommendation list?
+            if d['i_index'] in recos:
+                n_tp += 1
+
+        return float(n_tp) / len(test_samples)
 
     def evaluate_SMA(self, test_samples, window_size=5000, at=10):
         """Iterate recommend/update procedure and compute Simple Moving Averages (SMAs).
@@ -158,7 +215,7 @@ class Base:
         pass
 
     @abstractmethod
-    def __update(self, d):
+    def __update(self, d, is_batch_train):
         """Update model parameters based on d, a sample represented as a dictionary.
 
         Args:

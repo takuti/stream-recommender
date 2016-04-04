@@ -8,7 +8,7 @@ class IncrementalBiasedMF(Base):
     """Biased Incremental MF as one specific case of factorization machines; no context
     """
 
-    def __init__(self, n_user, n_item, k=40, l2_reg_w0=.01, l2_reg_w=.01, l2_reg_V=.01, learn_rate=.03):
+    def __init__(self, n_user, n_item, k=40, l2_reg_w0=.01, l2_reg_w=.01, l2_reg_V=.01, learn_rate=.003):
         self.n_user = n_user
         self.n_item = n_item
 
@@ -30,7 +30,7 @@ class IncrementalBiasedMF(Base):
         self.prev_w0 = float('inf')
         self.prev_w = np.array([])
 
-    def _Base__update(self, d):
+    def _Base__update(self, d, is_batch_train=False):
         u_index = d['u_index']
         i_index = d['i_index']
 
