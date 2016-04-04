@@ -8,12 +8,12 @@ class IncrementalMF(Base):
     """Incremental Matrix Factorization
     """
 
-    def __init__(self, n_user, n_item, static_flg=False, k=40, l2_reg=.01, learn_rate=.003):
+    def __init__(self, n_user, n_item, is_static=False, k=40, l2_reg=.01, learn_rate=.003):
         self.n_user = n_user
         self.n_item = n_item
 
         # if True, parameters will not be updated in evaluation
-        self.static_flg = static_flg
+        self.is_static = is_static
 
         self.k = k
         self.l2_reg_u = l2_reg
@@ -29,7 +29,7 @@ class IncrementalMF(Base):
 
     def _Base__update(self, d, is_batch_train=False):
         # static baseline; w/o updating the model
-        if not is_batch_train and self.static_flg:
+        if not is_batch_train and self.is_static:
             return
 
         u_index = d['u_index']

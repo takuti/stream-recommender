@@ -27,11 +27,11 @@ class Runner:
 
         self.__prepare()
 
-    def iMF(self, static_flg=False):
+    def iMF(self, is_static=False):
         """Incremental Matrix Factorization
 
         Args:
-            static_flg (bool): choose whether a model is incrementally updated.
+            is_static (bool): choose whether a model is incrementally updated.
                 True -- baseline
                 False -- incremental matrix factorization
 
@@ -41,7 +41,7 @@ class Runner:
 
         """
         if self.method == 'SMA':
-            model = IncrementalMF(self.n_user, self.n_item, static_flg)
+            model = IncrementalMF(self.n_user, self.n_item, is_static)
 
             # pre-train
             batch_tail = self.n_batch_train + self.n_batch_test
@@ -52,7 +52,7 @@ class Runner:
             recalls = np.array([])
             s_time = 0.
             for i in range(self.n_trial):
-                model = IncrementalMF(self.n_user, self.n_item, static_flg)
+                model = IncrementalMF(self.n_user, self.n_item, is_static)
 
                 batch_tail = self.n_batch_train + self.n_batch_test
                 model.fit(self.samples[:self.n_batch_train], self.samples[self.n_batch_train:batch_tail])
@@ -303,7 +303,7 @@ def cli(method, model, context, limit, n_trial):
     exp = Runner(method=method, limit=limit, n_trial=n_trial)
 
     if model == 'all_MF':
-        avgs, time = exp.iMF(static_flg=True)
+        avgs, time = exp.iMF(is_static=True)
         save('results/baseline_' + method + '.txt', avgs, time)
 
         avgs, time = exp.iMF()
@@ -319,7 +319,7 @@ def cli(method, model, context, limit, n_trial):
         save('results/iFMs_contexts_' + method + '.txt', avgs, time)
     else:
         if model == 'baseline' or model == 'iMF':
-            avgs, time = exp.iMF(static_flg=True) if model == 'baseline' else exp.iMF()
+            avgs, time = exp.iMF(is_static=True) if model == 'baseline' else exp.iMF()
         elif model == 'biased-iMF':
             avgs, time = exp.biased_iMF()
         elif model == 'iFMs':
