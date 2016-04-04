@@ -1,5 +1,12 @@
 from abc import ABCMeta, abstractmethod
 
+from logging import getLogger, StreamHandler, DEBUG
+logger = getLogger(__name__)
+handler = StreamHandler()
+handler.setLevel(DEBUG)
+logger.setLevel(DEBUG)
+logger.addHandler(handler)
+
 import time
 import numpy as np
 
@@ -43,15 +50,13 @@ class Base:
         """
         self.__clear()
 
-        self.n_epoch = 0
-        prev_recall = 0.
+        # optimal number of epochs will be used by the forgetting methods
+        # this value should be found by some pre-experiments
+        self.n_epoch = 8
 
-        while True:
+        for i in range(self.n_epoch):
             # SGD requires us to shuffle samples in each iteration
             np.random.shuffle(train_samples)
-
-            # number of epochs will be used by the forgetting methods
-            self.n_epoch += 1
 
             # 20%: update models
             for d in train_samples:
@@ -64,11 +69,7 @@ class Base:
             # 30%: evaluate the current model
             recall = self.batch_evaluate(test_samples, at)
 
-            # batch training is converged
-            if recall < prev_recall:
-                break
-
-            prev_recall = recall
+        logger.debug('-- finish batch training: epoch = %d, recall = %.5f' % (self.n_epoch, recall))
 
         # for further incremental evaluation,
         # the model is incrementally updated by using the 20% samples

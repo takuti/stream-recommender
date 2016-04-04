@@ -1,5 +1,12 @@
 # coding: utf-8
 
+from logging import getLogger, StreamHandler, DEBUG
+logger = getLogger(__name__)
+handler = StreamHandler()
+handler.setLevel(DEBUG)
+logger.setLevel(DEBUG)
+logger.addHandler(handler)
+
 import numpy as np
 import time
 from calendar import monthrange
@@ -40,11 +47,14 @@ class Runner:
             float: average time to recommend/update for one sample.
 
         """
+        logger.debug('%s-based evaluation of iMF' % self.method)
+
+        batch_tail = self.n_batch_train + self.n_batch_test
+
         if self.method == 'SMA':
             model = IncrementalMF(self.n_user, self.n_item, is_static)
 
             # pre-train
-            batch_tail = self.n_batch_train + self.n_batch_test
             model.fit(self.samples[:self.n_batch_train], self.samples[self.n_batch_train:batch_tail])
 
             return model.evaluate_SMA(self.samples[batch_tail:batch_tail + self.n_test])
@@ -53,11 +63,10 @@ class Runner:
             s_time = 0.
             for i in range(self.n_trial):
                 model = IncrementalMF(self.n_user, self.n_item, is_static)
-
-                batch_tail = self.n_batch_train + self.n_batch_test
                 model.fit(self.samples[:self.n_batch_train], self.samples[self.n_batch_train:batch_tail])
 
                 recall, avg_time = model.evaluate_recall(self.samples[batch_tail:batch_tail + self.n_test])
+                logger.debug('Trial %d: recall = %.5f' % (i + 1, recall))
 
                 recalls = np.append(recalls, recall)
                 s_time += avg_time
@@ -72,10 +81,12 @@ class Runner:
            float: average time to recommend/update for one sample
 
         """
+        logger.debug('%s-based evaluation of biased-iMF' % self.method)
+
+        batch_tail = self.n_batch_train + self.n_batch_test
+
         if self.method == 'SMA':
             model = IncrementalBiasedMF(self.n_user, self.n_item)
-
-            batch_tail = self.n_batch_train + self.n_batch_test
             model.fit(self.samples[:self.n_batch_train], self.samples[self.n_batch_train:batch_tail])
 
             return model.evaluate_SMA(self.samples[batch_tail:batch_tail + self.n_test])
@@ -84,11 +95,10 @@ class Runner:
             s_time = 0.
             for i in range(self.n_trial):
                 model = IncrementalBiasedMF(self.n_user, self.n_item)
-
-                batch_tail = self.n_batch_train + self.n_batch_test
                 model.fit(self.samples[:self.n_batch_train], self.samples[self.n_batch_train:batch_tail])
 
                 recall, avg_time = model.evaluate_recall(self.samples[batch_tail:batch_tail + self.n_test])
+                logger.debug('Trial %d: recall = %.5f' % (i + 1, recall))
 
                 recalls = np.append(recalls, recall)
                 s_time += avg_time
@@ -109,10 +119,12 @@ class Runner:
            float: average time to recommend/update for one sample
 
         """
+        logger.debug('%s-based evaluation of iFMs' % self.method)
+
+        batch_tail = self.n_batch_train + self.n_batch_test
+
         if self.method == 'SMA':
             model = IncrementalFMs(self.n_user, self.n_item, contexts)
-
-            batch_tail = self.n_batch_train + self.n_batch_test
             model.fit(self.samples[:self.n_batch_train], self.samples[self.n_batch_train:batch_tail])
 
             res = model.evaluate_SMA(self.samples[batch_tail:batch_tail + self.n_test])
@@ -121,11 +133,10 @@ class Runner:
             s_time = 0.
             for i in range(self.n_trial):
                 model = IncrementalFMs(self.n_user, self.n_item, contexts)
-
-                batch_tail = self.n_batch_train + self.n_batch_test
                 model.fit(self.samples[:self.n_batch_train], self.samples[self.n_batch_train:batch_tail])
 
                 recall, avg_time = model.evaluate_recall(self.samples[batch_tail:batch_tail + self.n_test])
+                logger.debug('Trial %d: recall = %.5f' % (i + 1, recall))
 
                 recalls = np.append(recalls, recall)
                 s_time += avg_time
@@ -183,6 +194,9 @@ class Runner:
         self.n_batch_train = int(self.n_sample * 0.3)  # 30% for pre-training to avoid cold-start
         self.n_batch_test = int(self.n_sample * 0.2)  # 20% for evaluation of pre-training
         self.n_test = min(self.n_sample - (self.n_batch_train + self.n_batch_test), self.limit)
+
+        logger.debug('[exp] n_sample = %d; %d (30%%) + %d (20%%) + %d (50%%)' % (self.n_sample, self.n_batch_train, self.n_batch_test, self.n_test))
+        logger.debug('[exp] n_user = %d, n_item = %d' % (self.n_user, self.n_item))
 
     def __load_movies(self):
         """Load movie genres as a context.
