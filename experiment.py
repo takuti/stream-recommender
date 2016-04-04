@@ -16,11 +16,14 @@ PATH_TO_USERS = '../../data/ml-1m/users.dat'
 
 class Runner:
 
-    def __init__(self, method='SMA', limit=200000):
+    def __init__(self, method='SMA', limit=200000, n_trial=1):
         self.method = method
 
         # number of test samples
         self.limit = limit
+
+        # number of trials for the incrementalRecall-based evaluation
+        self.n_trial = n_trial
 
         self.__prepare()
 
@@ -37,16 +40,29 @@ class Runner:
             float: average time to recommend/update for one sample.
 
         """
-        model = IncrementalMF(self.n_user, self.n_item, static_flg)
-
-        # pre-train
-        batch_tail = self.n_batch_train + self.n_batch_test
-        model.fit(self.samples[:self.n_batch_train], self.samples[self.n_batch_train:batch_tail])
-
         if self.method == 'SMA':
+            model = IncrementalMF(self.n_user, self.n_item, static_flg)
+
+            # pre-train
+            batch_tail = self.n_batch_train + self.n_batch_test
+            model.fit(self.samples[:self.n_batch_train], self.samples[self.n_batch_train:batch_tail])
+
             return model.evaluate_SMA(self.samples[batch_tail:batch_tail + self.n_test])
         elif self.method == 'recall':
-            return model.evaluate_recall(self.samples[batch_tail:batch_tail + self.n_test])
+            recalls = np.array([])
+            s_time = 0.
+            for i in range(self.n_trial):
+                model = IncrementalMF(self.n_user, self.n_item, static_flg)
+
+                batch_tail = self.n_batch_train + self.n_batch_test
+                model.fit(self.samples[:self.n_batch_train], self.samples[self.n_batch_train:batch_tail])
+
+                recall, avg_time = model.evaluate_recall(self.samples[batch_tail:batch_tail + self.n_test])
+
+                recalls = np.append(recalls, recall)
+                s_time += avg_time
+
+            return recalls, s_time / self.n_trial
 
     def biased_iMF(self):
         """Biased Incremental Matrix Factorizaton
@@ -56,15 +72,28 @@ class Runner:
            float: average time to recommend/update for one sample
 
         """
-        model = IncrementalBiasedMF(self.n_user, self.n_item)
-
-        batch_tail = self.n_batch_train + self.n_batch_test
-        model.fit(self.samples[:self.n_batch_train], self.samples[self.n_batch_train:batch_tail])
-
         if self.method == 'SMA':
+            model = IncrementalBiasedMF(self.n_user, self.n_item)
+
+            batch_tail = self.n_batch_train + self.n_batch_test
+            model.fit(self.samples[:self.n_batch_train], self.samples[self.n_batch_train:batch_tail])
+
             return model.evaluate_SMA(self.samples[batch_tail:batch_tail + self.n_test])
         elif self.method == 'recall':
-            return model.evaluate_recall(self.samples[batch_tail:batch_tail + self.n_test])
+            recalls = np.array([])
+            s_time = 0.
+            for i in range(self.n_trial):
+                model = IncrementalBiasedMF(self.n_user, self.n_item)
+
+                batch_tail = self.n_batch_train + self.n_batch_test
+                model.fit(self.samples[:self.n_batch_train], self.samples[self.n_batch_train:batch_tail])
+
+                recall, avg_time = model.evaluate_recall(self.samples[batch_tail:batch_tail + self.n_test])
+
+                recalls = np.append(recalls, recall)
+                s_time += avg_time
+
+            return recalls, s_time / self.n_trial
 
     def iFMs(self, contexts=()):
         """Incremental Factorization Machines
@@ -80,15 +109,28 @@ class Runner:
            float: average time to recommend/update for one sample
 
         """
-        model = IncrementalFMs(self.n_user, self.n_item, contexts)
-
-        batch_tail = self.n_batch_train + self.n_batch_test
-        model.fit(self.samples[:self.n_batch_train], self.samples[self.n_batch_train:batch_tail])
-
         if self.method == 'SMA':
+            model = IncrementalFMs(self.n_user, self.n_item, contexts)
+
+            batch_tail = self.n_batch_train + self.n_batch_test
+            model.fit(self.samples[:self.n_batch_train], self.samples[self.n_batch_train:batch_tail])
+
             res = model.evaluate_SMA(self.samples[batch_tail:batch_tail + self.n_test])
         elif self.method == 'recall':
-            res = model.evaluate_recall(self.samples[batch_tail:batch_tail + self.n_test])
+            recalls = np.array([])
+            s_time = 0.
+            for i in range(self.n_trial):
+                model = IncrementalFMs(self.n_user, self.n_item, contexts)
+
+                batch_tail = self.n_batch_train + self.n_batch_test
+                model.fit(self.samples[:self.n_batch_train], self.samples[self.n_batch_train:batch_tail])
+
+                recall, avg_time = model.evaluate_recall(self.samples[batch_tail:batch_tail + self.n_test])
+
+                recalls = np.append(recalls, recall)
+                s_time += avg_time
+
+            res = (recalls, s_time / self.n_trial)
 
         # print auto-updated regularization params
         print model.l2_reg_w0, model.l2_reg_w, model.l2_reg_V
@@ -256,8 +298,9 @@ contexts = ['dt', 'genre', 'demographics']
 @click.option('--model', type=click.Choice(models), default=models[0], help='Choose a factorization model')
 @click.option('--context', '-c', type=click.Choice(contexts), multiple=True, help='Choose contexts used by iFMs')
 @click.option('--limit', default=200000, help='Number of test samples for evaluation')
-def cli(method, model, context, limit):
-    exp = Runner(method=method, limit=limit)
+@click.option('--n_trial', '-n', default=1, help='Number of trials for incrementallRecall-based evaluation.')
+def cli(method, model, context, limit, n_trial):
+    exp = Runner(method=method, limit=limit, n_trial=n_trial)
 
     if model == 'all_MF':
         avgs, time = exp.iMF(static_flg=True)
