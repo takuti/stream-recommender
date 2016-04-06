@@ -29,6 +29,7 @@ class IncrementalBiasedMF(Base):
         self.V = np.random.normal(0., 0.1, (self.p, self.k))
         self.prev_w0 = float('inf')
         self.prev_w = np.array([])
+        self.prev_V = np.array([])
 
     def _Base__update(self, d, is_batch_train=False):
         u_index = d['u_index']
@@ -42,9 +43,14 @@ class IncrementalBiasedMF(Base):
         err = 1. - pred
 
         # update regularization parameters
-        if self.prev_w0 != float('inf') and self.prev_w.size != 0:
+        if self.prev_w0 != float('inf') and self.prev_w.size != 0 and self.prev_V.size != 0:
             self.l2_reg_w0 = max(0., self.l2_reg_w0 + 4. * self.learn_rate * (err * self.learn_rate * self.prev_w0))
             self.l2_reg_w = max(0., self.l2_reg_w + 4. * self.learn_rate * (err * self.learn_rate * (self.prev_w[u] + self.prev_w[i])))
+
+            dot_v = self.V[u] + self.V[i]  # (k, )
+            dot_prev_v = self.prev_V[u] + self.prev_V[i]  # (k, )
+            s_duplicated = self.V[u] * self.prev_V[u] + self.V[i] * self.prev_V[i]  # (k, )
+            self.l2_rev_V = np.maximum(np.zeros(self.k), self.l2_reg_V + 4. * self.learn_rate * (err * self.learn_rate * (dot_v * dot_prev_v - s_duplicated)))
 
         # keep previous w0 and update w0
         self.prev_w0 = self.w0
@@ -55,6 +61,10 @@ class IncrementalBiasedMF(Base):
         self.prev_w[:] = self.w
         self.w[u] = self.w[u] + 2. * self.learn_rate * (err * 1. - self.l2_reg_w * self.w[u])
         self.w[i] = self.w[i] + 2. * self.learn_rate * (err * 1. - self.l2_reg_w * self.w[i])
+
+        # keep the previous V
+        self.prev_V = np.empty_like(self.V)
+        self.prev_V[:] = self.V
 
         # update V (x[u] = x[i] = 1.)
         next_u_vec = self.V[u] + 2. * self.learn_rate * (err * 1. * self.V[i] - self.l2_reg_V * self.V[u])
