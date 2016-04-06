@@ -23,7 +23,7 @@ PATH_TO_USERS = '../../data/ml-1m/users.dat'
 
 class Runner:
 
-    def __init__(self, method='SMA', limit=200000, n_trial=1):
+    def __init__(self, method='SMA', limit=200000, n_trial=1, n_epoch=1):
         self.method = method
 
         # number of test samples
@@ -31,6 +31,9 @@ class Runner:
 
         # number of trials for the incrementalRecall-based evaluation
         self.n_trial = n_trial
+
+        # number of epochs for the batch training
+        self.n_epoch = n_epoch
 
         self.__prepare()
 
@@ -55,7 +58,11 @@ class Runner:
             model = IncrementalMF(self.n_user, self.n_item, is_static)
 
             # pre-train
-            model.fit(self.samples[:self.n_batch_train], self.samples[self.n_batch_train:batch_tail])
+            model.fit(
+                self.samples[:self.n_batch_train],
+                self.samples[self.n_batch_train:batch_tail],
+                n_epoch=self.n_epoch
+            )
 
             return model.evaluate_SMA(self.samples[batch_tail:batch_tail + self.n_test])
         elif self.method == 'recall':
@@ -63,7 +70,11 @@ class Runner:
             s_time = 0.
             for i in range(self.n_trial):
                 model = IncrementalMF(self.n_user, self.n_item, is_static)
-                model.fit(self.samples[:self.n_batch_train], self.samples[self.n_batch_train:batch_tail])
+                model.fit(
+                    self.samples[:self.n_batch_train],
+                    self.samples[self.n_batch_train:batch_tail],
+                    n_epoch=self.n_epoch
+                )
 
                 recall, avg_time = model.evaluate_recall(self.samples[batch_tail:batch_tail + self.n_test])
                 logger.debug('Trial %d: recall = %.5f' % (i + 1, recall))
@@ -87,7 +98,11 @@ class Runner:
 
         if self.method == 'SMA':
             model = IncrementalBiasedMF(self.n_user, self.n_item)
-            model.fit(self.samples[:self.n_batch_train], self.samples[self.n_batch_train:batch_tail])
+            model.fit(
+                self.samples[:self.n_batch_train],
+                self.samples[self.n_batch_train:batch_tail],
+                n_epoch=self.n_epoch
+            )
 
             return model.evaluate_SMA(self.samples[batch_tail:batch_tail + self.n_test])
         elif self.method == 'recall':
@@ -95,7 +110,11 @@ class Runner:
             s_time = 0.
             for i in range(self.n_trial):
                 model = IncrementalBiasedMF(self.n_user, self.n_item)
-                model.fit(self.samples[:self.n_batch_train], self.samples[self.n_batch_train:batch_tail])
+                model.fit(
+                    self.samples[:self.n_batch_train],
+                    self.samples[self.n_batch_train:batch_tail],
+                    n_epoch=self.n_epoch
+                )
 
                 recall, avg_time = model.evaluate_recall(self.samples[batch_tail:batch_tail + self.n_test])
                 logger.debug('Trial %d: recall = %.5f' % (i + 1, recall))
@@ -125,7 +144,11 @@ class Runner:
 
         if self.method == 'SMA':
             model = IncrementalFMs(self.n_user, self.n_item, contexts)
-            model.fit(self.samples[:self.n_batch_train], self.samples[self.n_batch_train:batch_tail])
+            model.fit(
+                self.samples[:self.n_batch_train],
+                self.samples[self.n_batch_train:batch_tail],
+                n_epoch=self.n_epoch
+            )
 
             res = model.evaluate_SMA(self.samples[batch_tail:batch_tail + self.n_test])
         elif self.method == 'recall':
@@ -133,7 +156,11 @@ class Runner:
             s_time = 0.
             for i in range(self.n_trial):
                 model = IncrementalFMs(self.n_user, self.n_item, contexts)
-                model.fit(self.samples[:self.n_batch_train], self.samples[self.n_batch_train:batch_tail])
+                model.fit(
+                    self.samples[:self.n_batch_train],
+                    self.samples[self.n_batch_train:batch_tail],
+                    n_epoch=self.n_epoch
+                )
 
                 recall, avg_time = model.evaluate_recall(self.samples[batch_tail:batch_tail + self.n_test])
                 logger.debug('Trial %d: recall = %.5f' % (i + 1, recall))
@@ -313,8 +340,9 @@ contexts = ['dt', 'genre', 'demographics']
 @click.option('--context', '-c', type=click.Choice(contexts), multiple=True, help='Choose contexts used by iFMs')
 @click.option('--limit', default=200000, help='Number of test samples for evaluation')
 @click.option('--n_trial', '-n', default=1, help='Number of trials for incrementallRecall-based evaluation.')
-def cli(method, model, context, limit, n_trial):
-    exp = Runner(method=method, limit=limit, n_trial=n_trial)
+@click.option('--n_epoch', default=1, help='Number of epochs for batch training.')
+def cli(method, model, context, limit, n_trial, n_epoch):
+    exp = Runner(method=method, limit=limit, n_trial=n_trial, n_epoch=n_epoch)
 
     if model == 'all_MF':
         avgs, time = exp.iMF(is_static=True)

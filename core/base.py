@@ -36,7 +36,7 @@ class Base:
         # initialize models
         self.__clear()
 
-    def fit(self, train_samples, test_samples, at=10):
+    def fit(self, train_samples, test_samples, at=10, n_epoch=1):
         """Train a model using the first 30% positive samples to avoid cold-start.
 
         Evaluation of this batch training is done by using the next 20% positive samples.
@@ -46,15 +46,12 @@ class Base:
             train_samples (list of dict): Positive training samples (0-30%).
             test_sample (list of dict): Test samples (30-50%).
             at (int): Evaluation metric of this batch pre-training will be recall@{at}.
+            n_epoch (int): Number of epochs for the batch training.
 
         """
         self.__clear()
 
-        # optimal number of epochs will be used by the forgetting methods
-        # this value should be found by some pre-experiments
-        self.n_epoch = 8
-
-        for i in range(self.n_epoch):
+        for epoch in range(n_epoch):
             # SGD requires us to shuffle samples in each iteration
             np.random.shuffle(train_samples)
 
@@ -69,7 +66,7 @@ class Base:
             # 20%: evaluate the current model
             recall = self.batch_evaluate(test_samples, at)
 
-        logger.debug('-- finish batch training: epoch = %d, recall = %.5f' % (self.n_epoch, recall))
+        logger.debug('-- finish batch training: epoch = %d, recall = %.5f' % (n_epoch, recall))
 
         # for further incremental evaluation,
         # the model is incrementally updated by using the 20% samples
