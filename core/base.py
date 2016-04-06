@@ -58,7 +58,7 @@ class Base:
             # SGD requires us to shuffle samples in each iteration
             np.random.shuffle(train_samples)
 
-            # 20%: update models
+            # 30%: update models
             for d in train_samples:
                 u_index = d['u_index']
                 i_index = d['i_index']
@@ -66,7 +66,7 @@ class Base:
 
                 self.__update(d, is_batch_train=True)
 
-            # 30%: evaluate the current model
+            # 20%: evaluate the current model
             recall = self.batch_evaluate(test_samples, at)
 
         logger.debug('-- finish batch training: epoch = %d, recall = %.5f' % (self.n_epoch, recall))
