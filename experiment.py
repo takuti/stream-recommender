@@ -46,83 +46,40 @@ class Runner:
                 False -- incremental matrix factorization
 
         Returns:
-            list of float values: Simple Moving Averages.
-            float: average time to recommend/update for one sample.
+            list of float values: Simple Moving Averages or avg. incrementalRecall.
+            float: average time to recommend/update for one sample
 
         """
         logger.debug('%s-based evaluation of iMF' % self.method)
 
-        batch_tail = self.n_batch_train + self.n_batch_test
+        def create():
+            return IncrementalMF(self.n_user, self.n_item, is_static)
 
-        if self.method == 'SMA':
-            model = IncrementalMF(self.n_user, self.n_item, is_static)
-
-            # pre-train
-            model.fit(
-                self.samples[:self.n_batch_train],
-                self.samples[self.n_batch_train:batch_tail],
-                n_epoch=self.n_epoch
-            )
-
-            return model.evaluate_SMA(self.samples[batch_tail:batch_tail + self.n_test])
-        elif self.method == 'recall':
-            recalls = np.array([])
-            s_time = 0.
-            for i in range(self.n_trial):
-                model = IncrementalMF(self.n_user, self.n_item, is_static)
-                model.fit(
-                    self.samples[:self.n_batch_train],
-                    self.samples[self.n_batch_train:batch_tail],
-                    n_epoch=self.n_epoch
-                )
-
-                recall, avg_time = model.evaluate_recall(self.samples[batch_tail:batch_tail + self.n_test])
-                logger.debug('Trial %d: recall = %.5f' % (i + 1, recall))
-
-                recalls = np.append(recalls, recall)
-                s_time += avg_time
-
-            return recalls, s_time / self.n_trial
+        model, res = self.__run(create)
+        return res
 
     def biased_iMF(self):
         """Biased Incremental Matrix Factorizaton
 
         Returns:
-           list of float values: Simple Moving Averages
-           float: average time to recommend/update for one sample
+            list of float values: Simple Moving Averages or avg. incrementalRecall.
+            float: average time to recommend/update for one sample
 
         """
         logger.debug('%s-based evaluation of biased-iMF' % self.method)
 
-        batch_tail = self.n_batch_train + self.n_batch_test
+        def create():
+            return IncrementalBiasedMF(self.n_user, self.n_item)
 
-        if self.method == 'SMA':
-            model = IncrementalBiasedMF(self.n_user, self.n_item)
-            model.fit(
-                self.samples[:self.n_batch_train],
-                self.samples[self.n_batch_train:batch_tail],
-                n_epoch=self.n_epoch
-            )
+        model, res = self.__run(create)
 
-            return model.evaluate_SMA(self.samples[batch_tail:batch_tail + self.n_test])
-        elif self.method == 'recall':
-            recalls = np.array([])
-            s_time = 0.
-            for i in range(self.n_trial):
-                model = IncrementalBiasedMF(self.n_user, self.n_item)
-                model.fit(
-                    self.samples[:self.n_batch_train],
-                    self.samples[self.n_batch_train:batch_tail],
-                    n_epoch=self.n_epoch
-                )
+        logger.debug(
+            'Regularization parameters: w0 = %s, w = %s, V = %s' % (
+                model.l2_reg_w0,
+                model.l2_reg_w,
+                model.l2_reg_V))
 
-                recall, avg_time = model.evaluate_recall(self.samples[batch_tail:batch_tail + self.n_test])
-                logger.debug('Trial %d: recall = %.5f' % (i + 1, recall))
-
-                recalls = np.append(recalls, recall)
-                s_time += avg_time
-
-            return recalls, s_time / self.n_trial
+        return res
 
     def iFMs(self, contexts=()):
         """Incremental Factorization Machines
@@ -134,16 +91,43 @@ class Runner:
                 'demographics' -- vector of user demographics; 1 for M/F, 1 for age group, 21 for a categorical variable for occupation
 
         Returns:
-           list of float values: Simple Moving Averages
-           float: average time to recommend/update for one sample
+            list of float values: Simple Moving Averages or avg. incrementalRecall.
+            float: average time to recommend/update for one sample
 
         """
         logger.debug('%s-based evaluation of iFMs' % self.method)
 
+        def create():
+            return IncrementalFMs(self.n_user, self.n_item, contexts)
+
+        model, res = self.__run(create)
+
+        logger.debug(
+            'Regularization parameters: w0 = %s, w = %s, V = %s' % (
+                model.l2_reg_w0,
+                model.l2_reg_w,
+                model.l2_reg_V))
+
+        return res
+
+    def __run(self, callback):
+        """Test runner.
+
+        Args:
+            callback (function): Create a model used by this test run.
+
+        Returns:
+            instance of incremental model class: Created by the callback function.
+            list of float values: Simple Moving Averages or avg. incrementalRecall.
+            float: average time to recommend/update for one sample
+
+        """
         batch_tail = self.n_batch_train + self.n_batch_test
 
         if self.method == 'SMA':
-            model = IncrementalFMs(self.n_user, self.n_item, contexts)
+            model = callback()
+
+            # pre-train
             model.fit(
                 self.samples[:self.n_batch_train],
                 self.samples[self.n_batch_train:batch_tail],
@@ -155,7 +139,7 @@ class Runner:
             recalls = np.array([])
             s_time = 0.
             for i in range(self.n_trial):
-                model = IncrementalFMs(self.n_user, self.n_item, contexts)
+                model = callback()
                 model.fit(
                     self.samples[:self.n_batch_train],
                     self.samples[self.n_batch_train:batch_tail],
@@ -168,12 +152,9 @@ class Runner:
                 recalls = np.append(recalls, recall)
                 s_time += avg_time
 
-            res = (recalls, s_time / self.n_trial)
+            res = recalls, s_time / self.n_trial
 
-        # print auto-updated regularization params
-        print model.l2_reg_w0, model.l2_reg_w, model.l2_reg_V
-
-        return res
+        return model, res
 
     def __prepare(self):
         """Create a list of samples and count number of users/items.
