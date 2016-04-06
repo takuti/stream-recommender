@@ -15,7 +15,7 @@ class IncrementalBiasedMF(Base):
         self.k = k
         self.l2_reg_w0 = l2_reg_w0
         self.l2_reg_w = l2_reg_w
-        self.l2_reg_V = l2_reg_V
+        self.l2_reg_V = np.ones(k) * l2_reg_V
         self.learn_rate = learn_rate
 
         self.p = n_user + n_item
@@ -46,19 +46,19 @@ class IncrementalBiasedMF(Base):
             self.l2_reg_w0 = max(0., self.l2_reg_w0 + 4. * self.learn_rate * (err * self.learn_rate * self.prev_w0))
             self.l2_reg_w = max(0., self.l2_reg_w + 4. * self.learn_rate * (err * self.learn_rate * (self.prev_w[u] + self.prev_w[i])))
 
-        # update w0 with keeping the previous w0 to optimize it
+        # keep previous w0 and update w0
         self.prev_w0 = self.w0
         self.w0 = self.w0 + 2. * self.learn_rate * (err * 1. - self.l2_reg_w0 * self.w0)
 
-        # update w
+        # keep previous w and update w (x[u] = x[i] = 1.)
         self.prev_w = np.empty_like(self.w)
         self.prev_w[:] = self.w
         self.w[u] = self.w[u] + 2. * self.learn_rate * (err * 1. - self.l2_reg_w * self.w[u])
         self.w[i] = self.w[i] + 2. * self.learn_rate * (err * 1. - self.l2_reg_w * self.w[i])
 
-        # update V
-        next_u_vec = self.V[u] + 2. * self.learn_rate * (err * self.V[i] - self.l2_reg_V * self.V[u])
-        next_i_vec = self.V[i] + 2. * self.learn_rate * (err * self.V[u] - self.l2_reg_V * self.V[i])
+        # update V (x[u] = x[i] = 1.)
+        next_u_vec = self.V[u] + 2. * self.learn_rate * (err * 1. * self.V[i] - self.l2_reg_V * self.V[u])
+        next_i_vec = self.V[i] + 2. * self.learn_rate * (err * 1. * self.V[u] - self.l2_reg_V * self.V[i])
         self.V[u] = next_u_vec
         self.V[i] = next_i_vec
 
