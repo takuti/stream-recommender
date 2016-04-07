@@ -34,7 +34,7 @@ class IncrementalFMs(Base):
         self.k = k
         self.l2_reg_w0 = l2_reg_w0
         self.l2_reg_w = l2_reg_w
-        self.l2_reg_V = l2_reg_V
+        self.l2_reg_V = np.ones(k) * l2_reg_V
         self.learn_rate = learn_rate
 
         self._Base__clear()
@@ -46,12 +46,11 @@ class IncrementalFMs(Base):
         self.V = np.random.normal(0., 0.1, (self.p, self.k))
         self.prev_w0 = float('inf')
         self.prev_w = np.array([])
+        self.prev_V = np.array([])
 
-    def _Base__update(self, d):
+    def _Base__update(self, d, is_batch_train=False):
         u_index = d['u_index']
         i_index = d['i_index']
-
-        self.observed[u_index, i_index] = 1
 
         # create a sample vector and make prediction
         x = np.zeros(self.n_user + self.n_item)
@@ -72,6 +71,11 @@ class IncrementalFMs(Base):
             self.l2_reg_w0 = max(0., self.l2_reg_w0 + 4. * self.learn_rate * (err * self.learn_rate * self.prev_w0))
             self.l2_reg_w = max(0., self.l2_reg_w + 4. * self.learn_rate * (err * self.learn_rate * np.inner(x, self.prev_w)))
 
+            dot_v = np.dot(x_vec.T, self.V).reshape((self.k,))  # (k, )
+            dot_prev_v = np.dot(x_vec.T, self.prev_V).reshape((self.k,))  # (k, )
+            s_duplicated = np.dot((x_vec.T ** 2), self.V * self.prev_V).reshape((self.k,))  # (k, )
+            self.l2_rev_V = np.maximum(np.zeros(self.k), self.l2_reg_V + 4. * self.learn_rate * (err * self.learn_rate * (dot_v * dot_prev_v - s_duplicated)))
+
         # update w0 with keeping the previous value
         self.prev_w0 = self.w0
         self.w0 = self.w0 + 2. * self.learn_rate * (err * 1. - self.l2_reg_w0 * self.w0)
@@ -81,20 +85,21 @@ class IncrementalFMs(Base):
         self.prev_w[:] = self.w
 
         # keep the previous V
-        prev_V = np.empty_like(self.V)
-        prev_V[:] = self.V
+        self.prev_V = np.empty_like(self.V)
+        self.prev_V[:] = self.V
 
         # update w and V
+        prod = np.dot(np.array([x]), self.prev_V)  # (1, p) and (p, k) => (1, k)
         for pi in xrange(self.p):
             if x[pi] == 0.:
                 continue
 
             self.w[pi] = self.prev_w[pi] + 2. * self.learn_rate * (err * x[pi] - self.l2_reg_w * self.prev_w[pi])
 
-            g = err * x[pi] * (np.dot(np.array([x]), prev_V) - x[pi] * prev_V[pi])
-            self.V[pi] = prev_V[pi] + 2. * self.learn_rate * (g - self.l2_reg_V * prev_V[pi])
+            g = err * x[pi] * (prod - x[pi] * self.prev_V[pi])
+            self.V[pi] = self.prev_V[pi] + 2. * self.learn_rate * (g - self.l2_reg_V * self.prev_V[pi])
 
-    def _Base__recommend(self, d, at=10):
+    def _Base__recommend(self, d, target_i_indices, at=10):
         # i_mat is (p, n_item) for all possible pairs of the user (d['u_index']) and all items
         i_mat = self.__create_i_mat(d)
 
@@ -112,7 +117,7 @@ class IncrementalFMs(Base):
         pred = self.w0 + safe_sparse_dot(self.w, i_mat, dense_output=True) + interaction
         scores = np.abs(1. - (pred[:self.n_item] + np.sum(pred[self.n_item:])))
 
-        return self._Base__scores2recos(d['u_index'], scores, at)
+        return self._Base__scores2recos(d['u_index'], scores, target_i_indices, at)
 
     def __create_i_mat(self, d):
         """Create a matrix which covers all possible <user, item> pairs for a given user index.
