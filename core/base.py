@@ -183,7 +183,8 @@ class Base:
 
             # 1000 further unobserved items + item i interacted by user u
             unobserved_i_indices = np.where(self.observed[u_index, :] == 0)[0]
-            target_i_indices = np.random.choice(unobserved_i_indices, 1000, replace=False)
+            n_unobserved = unobserved_i_indices.size
+            target_i_indices = np.random.choice(unobserved_i_indices, min(n_unobserved, 1000), replace=False)
 
             # make top-{at} recommendation for the 1001 items
             recos = self.__recommend(d, target_i_indices, at)
