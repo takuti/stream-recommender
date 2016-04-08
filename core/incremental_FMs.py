@@ -58,7 +58,7 @@ class IncrementalFMs(Base):
         err = d['y'] - pred
 
         # update regularization parameters
-        if self.prev_w0 != float('inf') and self.prev_w.size != 0:
+        if self.prev_w0 != float('inf') and self.prev_w.size != 0 and self.prev_V.size != 0:
             self.l2_reg_w0 = max(0., self.l2_reg_w0 + 4. * self.learn_rate * (err * self.learn_rate * self.prev_w0))
             self.l2_reg_w = max(0., self.l2_reg_w + 4. * self.learn_rate * (err * self.learn_rate * np.inner(x, self.prev_w)))
 
