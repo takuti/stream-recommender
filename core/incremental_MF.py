@@ -8,9 +8,12 @@ class IncrementalMF(Base):
     """Incremental Matrix Factorization
     """
 
-    def __init__(self, n_user, n_item, is_static=False, k=40, l2_reg=.01, learn_rate=.003):
+    def __init__(self, n_user, n_item, is_positive_only=False, is_static=False, k=40, l2_reg=.01, learn_rate=.003):
         self.n_user = n_user
         self.n_item = n_item
+
+        # whether the problem is based on the explicit rating feedback, or positive-only feedback
+        self.is_positive_only = is_positive_only
 
         # if True, parameters will not be updated in evaluation
         self.is_static = is_static
@@ -38,7 +41,7 @@ class IncrementalMF(Base):
         u_vec = self.P[u_index]
         i_vec = self.Q[i_index]
 
-        err = 1. - np.inner(u_vec, i_vec)
+        err = d['y'] - np.inner(u_vec, i_vec)
 
         next_u_vec = u_vec + 2. * self.learn_rate * (err * i_vec - self.l2_reg_u * u_vec)
         next_i_vec = i_vec + 2. * self.learn_rate * (err * u_vec - self.l2_reg_i * i_vec)
@@ -49,6 +52,9 @@ class IncrementalMF(Base):
         u_index = d['u_index']
 
         pred = np.dot(self.P[u_index], self.Q.T)
-        scores = np.abs(1. - pred.reshape(self.n_item))
+        if self.is_positive_only:
+            scores = np.abs(1. - pred.reshape(self.n_item))
+        else:
+            scores = pred.reshape(self.n_item)
 
         return self._Base__scores2recos(u_index, scores, target_i_indices, at)

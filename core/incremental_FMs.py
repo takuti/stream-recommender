@@ -10,26 +10,17 @@ class IncrementalFMs(Base):
     """Incremental Factorization Machines
     """
 
-    def __init__(self, n_user, n_item, contexts, k=4, l2_reg_w0=.01, l2_reg_w=.01, l2_reg_V=30., learn_rate=.003):
+    def __init__(self, n_user, n_item, is_positive_only, contexts, k=4, l2_reg_w0=.01, l2_reg_w=.01, l2_reg_V=30., learn_rate=.003):
         self.n_user = n_user
         self.n_item = n_item
 
-        self.contexts = []
+        self.is_positive_only = is_positive_only
+
+        self.contexts = contexts
 
         self.p = n_user + n_item
-        if 'dt' in contexts:
-            self.contexts.append(('dt', 1))
-            self.p += 1
-        if 'genre' in contexts:
-            # 18 genres
-            self.contexts.append(('genre', 18))
-            self.p += 18
-        if 'demographics' in contexts:
-            # 1 for M/F, 1 for age, 21 for occupation(0-20)
-            self.contexts.append(('demographics', 23))
-            self.p += 23
-
-        self.n_context = len(contexts)
+        for ctx, dim in contexts:
+            self.p += dim
 
         self.k = k
         self.l2_reg_w0 = l2_reg_w0
@@ -64,7 +55,7 @@ class IncrementalFMs(Base):
         pred = self.w0 + np.inner(self.w, x) + interaction
 
         # compute current error
-        err = 1. - pred
+        err = d['y'] - pred
 
         # update regularization parameters
         if self.prev_w0 != float('inf') and self.prev_w.size != 0:
@@ -115,7 +106,10 @@ class IncrementalFMs(Base):
         interaction /= 2.  # (n_item,)
 
         pred = self.w0 + safe_sparse_dot(self.w, i_mat, dense_output=True) + interaction
-        scores = np.abs(1. - (pred[:self.n_item] + np.sum(pred[self.n_item:])))
+        if self.is_positive_only:
+            scores = np.abs(1. - (pred[:self.n_item] + np.sum(pred[self.n_item:])))
+        else:
+            scores = pred[:self.n_item] + np.sum(pred[self.n_item:])
 
         return self._Base__scores2recos(d['u_index'], scores, target_i_indices, at)
 

@@ -8,9 +8,11 @@ class IncrementalBiasedMF(Base):
     """Biased Incremental MF as one specific case of factorization machines; no context
     """
 
-    def __init__(self, n_user, n_item, k=40, l2_reg_w0=.01, l2_reg_w=.01, l2_reg_V=.01, learn_rate=.003):
+    def __init__(self, n_user, n_item, is_positive_only, k=40, l2_reg_w0=.01, l2_reg_w=.01, l2_reg_V=.01, learn_rate=.003):
         self.n_user = n_user
         self.n_item = n_item
+
+        self.is_positive_only = is_positive_only
 
         self.k = k
         self.l2_reg_w0 = l2_reg_w0
@@ -40,7 +42,7 @@ class IncrementalBiasedMF(Base):
 
         # make prediction and compute current error
         pred = np.inner(self.V[u], self.V[i]) + self.w0 + self.w[u] + self.w[i]
-        err = 1. - pred
+        err = d['y'] - pred
 
         # update regularization parameters
         if self.prev_w0 != float('inf') and self.prev_w.size != 0 and self.prev_V.size != 0:
@@ -77,6 +79,9 @@ class IncrementalBiasedMF(Base):
         i_offset = self.n_user
 
         pred = np.dot(self.V[u_index], self.V[i_offset:].T) + self.w0 + self.w[u_index] + self.w[i_offset:]
-        scores = np.abs(1. - pred.reshape(self.n_item))
+        if self.is_positive_only:
+            scores = np.abs(1. - pred.reshape(self.n_item))
+        else:
+            scores = pred.reshape(self.n_item)
 
         return self._Base__scores2recos(u_index, scores, target_i_indices, at)

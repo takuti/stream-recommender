@@ -258,7 +258,13 @@ class Base:
         """
         recos = np.array([])
         target_scores = scores[target_i_indices]
-        for i_index in target_i_indices[np.argsort(target_scores)]:
+
+        sorted_indices = np.argsort(target_scores)
+        if not self.is_positive_only:
+            # for explicit rating feedback, larger scores mean promising items
+            sorted_indices = sorted_indices[::-1]
+
+        for i_index in target_i_indices[sorted_indices]:
             # already observed <user, item> pair is NOT recommended
             if self.observed[u_index, i_index] == 1:
                 continue
