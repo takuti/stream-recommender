@@ -171,9 +171,9 @@ models = ['baseline', 'iMF', 'biased-iMF', 'iFMs', 'all_MF', 'all_FMs']
 methods = ['SMA', 'recall']
 datasets = [
     'ML1M',     # explicit rating feedback (w/ contexts)
-    'ML100K',   # explicit rating feedback (w/ contexts)
+    'ML100k',   # explicit rating feedback (w/ contexts)
     'ML1M+',    # positive-only feedback (w/ contexts)
-    'ML100K+',  # positive-only feedback (w/ contexts)
+    'ML100k+',  # positive-only feedback (w/ contexts)
     'LastFM',   # positive-only feedback (w/ contexts)
     'Epinions'  # explicit rating feedback (w/o contexts)
 ]
