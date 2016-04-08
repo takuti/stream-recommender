@@ -132,6 +132,8 @@ class MovieLens100kConverter:
         with open(self.path['users']) as f:
             lines = map(lambda l: l.rstrip().split('|'), f.readlines())
 
+        ages = [1, 18, 25, 35, 45, 50, 56, 999]
+
         all_occupations = ['administrator',
                            'artist',
                            'doctor',
@@ -158,7 +160,14 @@ class MovieLens100kConverter:
         for user_id_str, age_str, sex_str, occupation_str, zip_code in lines:
                 user_vec = np.zeros(1 + 1 + 21)  # 1 categorical, 1 value, 21 categorical
                 user_vec[0] = 0 if sex_str == 'M' else 1  # sex
-                user_vec[1] = int(age_str)  # age (ML1M is "age group", but 100k has actual "age")
+
+                # age (ML1M is "age group", but 100k has actual "age")
+                age = int(age_str)
+                for i in range(7):
+                    if age >= ages[i] and age < ages[i + 1]:
+                        user_vec[1] = i
+                        break
+
                 user_vec[2 + all_occupations.index(occupation_str)] = 1  # occupation (1-of-21)
                 users[int(user_id_str)] = user_vec
 
