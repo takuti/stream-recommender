@@ -65,6 +65,7 @@ class Base:
 
             # 20%: evaluate the current model
             recall = self.batch_evaluate(test_samples, at)
+            logger.debug('epoch %2d: recall = %f' % (epoch + 1, recall))
 
         logger.debug('-- finish batch training: epoch = %d, recall = %.5f' % (n_epoch, recall))
 
