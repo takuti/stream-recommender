@@ -33,6 +33,15 @@ class IncrementalBiasedMF(Base):
         self.prev_w = np.array([])
         self.prev_V = np.array([])
 
+    def _Base__predict(self, d):
+        u_index = d['u_index']
+        i_index = d['i_index']
+
+        u = u_index
+        i = self.n_user + i_index
+
+        return np.inner(self.V[u], self.V[i]) + self.w0 + self.w[u] + self.w[i]
+
     def _Base__update(self, d, is_batch_train=False):
         u_index = d['u_index']
         i_index = d['i_index']

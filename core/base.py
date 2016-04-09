@@ -64,10 +64,12 @@ class Base:
                 self.__update(d, is_batch_train=True)
 
             # 20%: evaluate the current model
-            recall = self.batch_evaluate(test_samples, at)
-            logger.debug('epoch %2d: recall = %f' % (epoch + 1, recall))
-
-        logger.debug('-- finish batch training: epoch = %d, recall = %.5f' % (n_epoch, recall))
+            if self.is_positive_only:
+                recall = self.batch_evaluate_recall(test_samples, at)
+                logger.debug('epoch %2d: recall@%d = %f' % (epoch + 1, at, recall))
+            else:
+                rmse = self.batch_evaluate_RMSE(test_samples)
+                logger.debug('epoch %2d: RMSE = %f' % (epoch + 1, rmse))
 
         # for further incremental evaluation,
         # the model is incrementally updated by using the 20% samples
@@ -78,7 +80,7 @@ class Base:
 
             self.__update(d)
 
-    def batch_evaluate(self, test_samples, at):
+    def batch_evaluate_recall(self, test_samples, at):
         """Evaluate the current model by using the given test samples.
 
         Args:
@@ -99,6 +101,21 @@ class Base:
                 n_tp += 1
 
         return float(n_tp) / len(test_samples)
+
+    def batch_evaluate_RMSE(self, test_samples):
+        """Evaluate the current model by using the given test samples.
+
+        Args:
+            test_samples (list of dict): Current model is evaluated by these samples.
+
+        """
+        s = 0.
+
+        # for each of test samples, make prediction and compute an error
+        for i, d in enumerate(test_samples):
+            s += ((d['y'] - self.__predict(d)) ** 2)
+
+        return np.sqrt(s / len(test_samples))
 
     def evaluate_SMA(self, test_samples, window_size=5000, at=10):
         """Iterate recommend/update procedure and compute Simple Moving Averages (SMAs).
@@ -222,6 +239,19 @@ class Base:
         """
         self.observed = np.zeros((self.n_user, self.n_item))
         pass
+
+    @abstractmethod
+    def __predict(self, d):
+        """Make prediction for a sample 'd' using the current model parameters.
+
+        Args:
+            d (dict): A dictionary which has data of a sample.
+
+        Returns:
+            float: Predicted value.
+
+        """
+        return
 
     @abstractmethod
     def __update(self, d, is_batch_train):
