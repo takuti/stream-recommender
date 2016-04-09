@@ -157,7 +157,7 @@ class Base:
 
         return avgs, avg_time
 
-    def evaluate_recall(self, test_samples, at=10):
+    def evaluate_recall(self, test_samples, window_size=500, at=10):
         """Iterate recommend/update procedure and compute incremental recall.
 
         Args:
@@ -165,16 +165,18 @@ class Base:
             at (int): Top-{at} items will be recommended in each iteration.
 
         Returns:
-            float: Avg. incremental recall@{at}.
+            float: incremental recalls@{at}.
             float: Avg. recommend+update time in second.
 
         """
         n_test = len(test_samples)
+        recalls = np.zeros(n_test)
+
+        window = np.zeros(window_size)
+        sum_window = 0.
 
         # start timer
         start = time.clock()
-
-        n_hit = 0
 
         for i, d in enumerate(test_samples):
             u_index = d['u_index']
@@ -193,8 +195,15 @@ class Base:
             self.observed[u_index, i_index] = 1
 
             # increment a hit counter if i_index is in the top-{at} recommendation list
-            if i_index in recos:
-                n_hit += 1
+            # i.e. score the recommendation list based on the true observed item
+            wi = i % window_size
+
+            old_recall = window[wi]
+            new_recall = 1. if (i_index in recos) else 0.
+            window[wi] = new_recall
+
+            sum_window = sum_window - old_recall + new_recall
+            recalls[i] = sum_window / min(i + 1, window_size)
 
             # Step 2: update the model with the observed event
             self.__update(d)
@@ -202,7 +211,7 @@ class Base:
         # stop timer
         avg_time = (time.clock() - start) / n_test
 
-        return float(n_hit) / n_test, avg_time
+        return recalls, avg_time
 
     @abstractmethod
     def __clear(self):

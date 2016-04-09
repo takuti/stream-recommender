@@ -19,11 +19,8 @@ from converter.converter import Converter
 
 class Runner:
 
-    def __init__(self, method='SMA', dataset='ML1M', n_trial=1, n_epoch=1):
+    def __init__(self, method='SMA', dataset='ML1M', n_epoch=1):
         self.method = method
-
-        # number of trials for the incrementalRecall-based evaluation
-        self.n_trial = n_trial
 
         # number of epochs for the batch training
         self.n_epoch = n_epoch
@@ -122,41 +119,28 @@ class Runner:
 
         Returns:
             instance of incremental model class: Created by the callback function.
-            list of float values: Simple Moving Averages or avg. incrementalRecall.
+            list of float values: Average SMAs (sliding windows).
             float: average time to recommend/update for one sample
 
         """
         batch_tail = self.data.n_batch_train + self.data.n_batch_test
 
+        model = callback()
+
+        # pre-train
+        model.fit(
+            self.data.samples[:self.data.n_batch_train],
+            self.data.samples[self.data.n_batch_train:batch_tail],
+            n_epoch=self.n_epoch
+        )
+
         if self.method == 'SMA':
-            model = callback()
-
-            # pre-train
-            model.fit(
-                self.data.samples[:self.data.n_batch_train],
-                self.data.samples[self.data.n_batch_train:batch_tail],
-                n_epoch=self.n_epoch
-            )
-
             res = model.evaluate_SMA(self.data.samples[batch_tail:batch_tail + self.data.n_test])
         elif self.method == 'recall':
-            recalls = np.array([])
-            s_time = 0.
-            for i in range(self.n_trial):
-                model = callback()
-                model.fit(
-                    self.data.samples[:self.data.n_batch_train],
-                    self.data.samples[self.data.n_batch_train:batch_tail],
-                    n_epoch=self.n_epoch
-                )
-
-                recall, avg_time = model.evaluate_recall(self.data.samples[batch_tail:batch_tail + self.data.n_test])
-                logger.debug('Trial %d: recall = %.5f' % (i + 1, recall))
-
-                recalls = np.append(recalls, recall)
-                s_time += avg_time
-
-            res = recalls, s_time / self.n_trial
+            recalls, avg_time = model.evaluate_recall(
+                self.data.samples[batch_tail:batch_tail + self.data.n_test])
+            logger.debug('Avg. recall = %f' % np.mean(recalls))
+            res = recalls, avg_time
 
         return model, res
 
@@ -184,10 +168,9 @@ datasets = [
 @click.option('--method', type=click.Choice(methods), default=methods[0], help='Choose an evaluation methodology.')
 @click.option('--dataset', type=click.Choice(datasets), default=datasets[0], help='Choose a dataset')
 @click.option('--context/--no-context', default=False, help='Choose whether a feature vector for iFMs incorporates contextual variables.')
-@click.option('--n_trial', '-n', default=1, help='Number of trials for incrementallRecall-based evaluation.')
 @click.option('--n_epoch', default=1, help='Number of epochs for batch training.')
-def cli(model, method, dataset, context, n_trial, n_epoch):
-    exp = Runner(method=method, dataset=dataset, n_trial=n_trial, n_epoch=n_epoch)
+def cli(model, method, dataset, context, n_epoch):
+    exp = Runner(method=method, dataset=dataset, n_epoch=n_epoch)
 
     if model == 'all_MF':
         avgs, time = exp.iMF(is_static=True)
