@@ -10,7 +10,7 @@ class IncrementalFMs(Base):
     """Incremental Factorization Machines
     """
 
-    def __init__(self, n_user, n_item, is_positive_only, contexts, k=4, l2_reg_w0=.01, l2_reg_w=.01, l2_reg_V=30., learn_rate=.003):
+    def __init__(self, n_user, n_item, is_positive_only, contexts, k=40, l2_reg_w0=.01, l2_reg_w=.01, l2_reg_V=30., learn_rate=.003):
         self.n_user = n_user
         self.n_item = n_item
 
