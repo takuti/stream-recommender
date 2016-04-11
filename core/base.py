@@ -36,7 +36,7 @@ class Base:
         # initialize models
         self.__clear()
 
-    def fit(self, train_samples, test_samples, at=10, n_epoch=1):
+    def fit(self, train_samples, test_samples, at=10, n_epoch=1, is_monitoring=False):
         """Train a model using the first 30% positive samples to avoid cold-start.
 
         Evaluation of this batch training is done by using the next 20% positive samples.
@@ -73,12 +73,13 @@ class Base:
 
         # for further incremental evaluation,
         # the model is incrementally updated by using the 20% samples
-        for d in test_samples:
-            u_index = d['u_index']
-            i_index = d['i_index']
-            self.observed[u_index, i_index] = 1
+        if not is_monitoring:
+            for d in test_samples:
+                u_index = d['u_index']
+                i_index = d['i_index']
+                self.observed[u_index, i_index] = 1
 
-            self.__update(d)
+                self.__update(d)
 
     def batch_evaluate_recall(self, test_samples, at):
         """Evaluate the current model by using the given test samples.
@@ -117,64 +118,7 @@ class Base:
 
         return np.sqrt(s / len(test_samples))
 
-    def evaluate_SMA(self, test_samples, window_size=5000, at=10):
-        """Iterate recommend/update procedure and compute Simple Moving Averages (SMAs).
-
-        Args:
-            test_samples (list of dict): Positive test samples.
-            window_size (int): For SMA.
-            at (int): Top-{at} items will be recommended in each iteration.
-
-        Returns:
-            numpy array (n_test,): SMAs corresponding to iteration over the test samples.
-            float: Avg. recommend+update time in second.
-
-        """
-        n_test = len(test_samples)
-
-        window = np.zeros(window_size)
-        sum_window = 0.
-
-        avgs = np.zeros(n_test)
-        latest_avg = 0.
-
-        # start timer
-        start = time.clock()
-
-        for i, d in enumerate(test_samples):
-            u_index = d['u_index']
-            i_index = d['i_index']
-
-            # Step 1: if u is a known user, recommend items using current model
-            if 1 in self.observed[u_index, :]:
-                # make recommendation for all items
-                recos = self.__recommend(d, np.arange(self.n_item), at)
-
-                # score the recommendation list based on the true observed item
-                wi = i % window_size
-
-                old_recall = window[wi]
-                new_recall = 1. if (i_index in recos) else 0.
-                window[wi] = new_recall
-
-                sum_window = sum_window - old_recall + new_recall
-                latest_avg = sum_window / min(i + 1, window_size)
-
-            self.observed[u_index, i_index] = 1
-
-            # save the latest average
-            # if u is unobserved user, avg of this step will be same as the previous avg
-            avgs[i] = latest_avg
-
-            # Step 2: update the model with the observed event
-            self.__update(d)
-
-        # stop timer
-        avg_time = (time.clock() - start) / n_test
-
-        return avgs, avg_time
-
-    def evaluate_recall(self, test_samples, window_size=500, at=10):
+    def evaluate(self, test_samples, window_size=500, at=10):
         """Iterate recommend/update procedure and compute incremental recall.
 
         Args:

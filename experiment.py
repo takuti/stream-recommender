@@ -19,7 +19,7 @@ from converter.converter import Converter
 
 class Runner:
 
-    def __init__(self, method='SMA', dataset='ML1M', n_epoch=1):
+    def __init__(self, method='recall', dataset='ML1M', n_epoch=1):
         self.method = method
 
         # number of epochs for the batch training
@@ -127,18 +127,24 @@ class Runner:
 
         model = callback()
 
-        # pre-train
-        model.fit(
-            self.data.samples[:self.data.n_batch_train],
-            self.data.samples[self.data.n_batch_train:batch_tail],
-            n_epoch=self.n_epoch
-        )
-
-        if self.method == 'SMA':
-            res = model.evaluate_SMA(self.data.samples[batch_tail:batch_tail + self.data.n_test])
+        if self.method == 'monitor':
+            # pre-train
+            model.fit(
+                self.data.samples[:self.data.n_batch_train],
+                self.data.samples[self.data.n_batch_train:batch_tail],
+                n_epoch=self.n_epoch,
+                is_monitoring=True
+            )
+            res = model.evaluate(self.data.samples[self.data.n_batch_train:], window_size=5000)
         elif self.method == 'recall':
-            recalls, avg_time = model.evaluate_recall(
-                self.data.samples[batch_tail:batch_tail + self.data.n_test])
+            # pre-train
+            model.fit(
+                self.data.samples[:self.data.n_batch_train],
+                self.data.samples[self.data.n_batch_train:batch_tail],
+                n_epoch=self.n_epoch
+            )
+            recalls, avg_time = model.evaluate(
+                self.data.samples[batch_tail:batch_tail + self.data.n_test], window_size=500)
             logger.debug('Avg. recall = %f' % np.mean(recalls))
             res = recalls, avg_time
 
@@ -152,7 +158,7 @@ def save(path, avgs, time):
 import click
 
 models = ['baseline', 'iMF', 'biased-iMF', 'iFMs', 'all_MF', 'all_FMs']
-methods = ['SMA', 'recall']
+methods = ['recall', 'monitor']
 datasets = [
     'ML1M',     # explicit rating feedback (w/ contexts)
     'ML100k',   # explicit rating feedback (w/ contexts)
