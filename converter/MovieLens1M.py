@@ -19,14 +19,11 @@ class MovieLens1MConverter:
         # 1 delta time, 18 genres, and 23 demographics (1 for M/F, 1 for age, 21 for occupation(0-20))
         self.contexts = [('dt', 1), ('genre', 18), ('demographics', 23)]
 
-    def convert(self, is_positive_only=False):
+    def convert(self):
         """Create a list of samples and count number of users/items.
 
-        Args:
-            is_positive_only (bool): If True, ratings less than 5.0 are ignored.
-
         """
-        self.__load_ratings(is_positive_only)
+        self.__load_ratings()
 
         users = self.__load_users()
         movies = self.__load_movies()
@@ -58,7 +55,7 @@ class MovieLens1MConverter:
             prev_date = date
 
             # true value to compute gradient
-            y = 1. if is_positive_only else rating
+            y = 1.
 
             sample = {
                 'y': y,
@@ -71,8 +68,6 @@ class MovieLens1MConverter:
 
             self.samples.append(sample)
             self.dts.append(self.__delta(head_date, date))
-
-        self.is_positive_only = is_positive_only
 
         self.n_user = len(user_ids)
         self.n_item = len(item_ids)
@@ -143,11 +138,8 @@ class MovieLens1MConverter:
 
         return users
 
-    def __load_ratings(self, is_positive_only):
+    def __load_ratings(self):
         """Load all samples in the dataset.
-
-        Args:
-            is_positive_only (bool): If True, ratings less than 5.0 are ignored.
 
         """
         ratings = []
@@ -155,9 +147,7 @@ class MovieLens1MConverter:
             lines = map(lambda l: map(int, l.rstrip().split('::')), f.readlines())
             for l in lines:
                 # Since we consider positive-only feedback setting, ratings < 5 will be excluded.
-                if is_positive_only and l[2] == 5:
-                    ratings.append(l)
-                elif not is_positive_only:
+                if l[2] == 5:
                     ratings.append(l)
         self.ratings = np.asarray(ratings)
 

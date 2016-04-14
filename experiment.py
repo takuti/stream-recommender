@@ -48,7 +48,7 @@ class Runner:
         logger.debug('%s-based evaluation of iMF' % self.method)
 
         def create():
-            return IncrementalMF(self.data.n_user, self.data.n_item, self.data.is_positive_only, is_static)
+            return IncrementalMF(self.data.n_user, self.data.n_item, is_static)
 
         model, res = self.__run(create)
         return res
@@ -64,7 +64,7 @@ class Runner:
         logger.debug('%s-based evaluation of biased-iMF' % self.method)
 
         def create():
-            return IncrementalBiasedMF(self.data.n_user, self.data.n_item, self.data.is_positive_only)
+            return IncrementalBiasedMF(self.data.n_user, self.data.n_item)
 
         model, res = self.__run(create)
 
@@ -93,8 +93,7 @@ class Runner:
             partial_iFMs = partial(
                 IncrementalFMs,
                 n_user=self.data.n_user,
-                n_item=self.data.n_item,
-                is_positive_only=self.data.is_positive_only)
+                n_item=self.data.n_item)
 
             if is_context_aware:
                 return partial_iFMs(contexts=self.data.contexts)
@@ -159,14 +158,7 @@ import click
 
 models = ['baseline', 'iMF', 'biased-iMF', 'iFMs', 'all_MF', 'all_FMs']
 methods = ['recall', 'monitor']
-datasets = [
-    'ML1M',     # explicit rating feedback (w/ contexts)
-    'ML100k',   # explicit rating feedback (w/ contexts)
-    'ML1M+',    # positive-only feedback (w/ contexts)
-    'ML100k+',  # positive-only feedback (w/ contexts)
-    'LastFM',   # positive-only feedback (w/ contexts)
-    'Epinions'  # explicit rating feedback (w/o contexts)
-]
+datasets = ['ML1M', 'ML100k', 'LastFM']
 
 
 @click.command()

@@ -10,11 +10,9 @@ class IncrementalFMs(Base):
     """Incremental Factorization Machines
     """
 
-    def __init__(self, n_user, n_item, is_positive_only, contexts, k=40, l2_reg_w0=.01, l2_reg_w=.01, l2_reg_V=30., learn_rate=.003):
+    def __init__(self, n_user, n_item, contexts, k=40, l2_reg_w0=.01, l2_reg_w=.01, l2_reg_V=30., learn_rate=.003):
         self.n_user = n_user
         self.n_item = n_item
-
-        self.is_positive_only = is_positive_only
 
         self.contexts = contexts
 
@@ -121,10 +119,7 @@ class IncrementalFMs(Base):
         interaction /= 2.  # (n_item,)
 
         pred = self.w0 + safe_sparse_dot(self.w, i_mat, dense_output=True) + interaction
-        if self.is_positive_only:
-            scores = np.abs(1. - (pred[:self.n_item] + np.sum(pred[self.n_item:])))
-        else:
-            scores = pred[:self.n_item] + np.sum(pred[self.n_item:])
+        scores = np.abs(1. - (pred[:self.n_item] + np.sum(pred[self.n_item:])))
 
         return self._Base__scores2recos(d['u_index'], scores, target_i_indices, at)
 

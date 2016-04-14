@@ -21,15 +21,9 @@ class Converter:
         """
         if dataset == 'ML1M':
             c = MovieLens1MConverter()
-            c.convert(is_positive_only=False)
-        elif dataset == 'ML1M+':
-            c = MovieLens1MConverter()
-            c.convert(is_positive_only=True)
+            c.convert()
         elif dataset == 'ML100k':
             c = MovieLens100kConverter()
-            c.convert(is_positive_only=False)
-        elif dataset == 'ML100k+':
-            c = MovieLens100kConverter()
-            c.convert(is_positive_only=True)
+            c.convert()
 
         return c

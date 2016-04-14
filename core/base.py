@@ -64,12 +64,8 @@ class Base:
                 self.__update(d, is_batch_train=True)
 
             # 20%: evaluate the current model
-            if self.is_positive_only:
-                recall = self.batch_evaluate_recall(test_samples, at)
-                logger.debug('epoch %2d: recall@%d = %f' % (epoch + 1, at, recall))
-            else:
-                rmse = self.batch_evaluate_RMSE(test_samples)
-                logger.debug('epoch %2d: RMSE = %f' % (epoch + 1, rmse))
+            recall = self.batch_evaluate(test_samples, at)
+            logger.debug('epoch %2d: recall@%d = %f' % (epoch + 1, at, recall))
 
         # for further incremental evaluation,
         # the model is incrementally updated by using the 20% samples
@@ -81,7 +77,7 @@ class Base:
 
                 self.__update(d)
 
-    def batch_evaluate_recall(self, test_samples, at):
+    def batch_evaluate(self, test_samples, at):
         """Evaluate the current model by using the given test samples.
 
         Args:
@@ -102,21 +98,6 @@ class Base:
                 n_tp += 1
 
         return float(n_tp) / len(test_samples)
-
-    def batch_evaluate_RMSE(self, test_samples):
-        """Evaluate the current model by using the given test samples.
-
-        Args:
-            test_samples (list of dict): Current model is evaluated by these samples.
-
-        """
-        s = 0.
-
-        # for each of test samples, make prediction and compute an error
-        for i, d in enumerate(test_samples):
-            s += ((d['y'] - self.__predict(d)) ** 2)
-
-        return np.sqrt(s / len(test_samples))
 
     def evaluate(self, test_samples, window_size=500, at=10):
         """Iterate recommend/update procedure and compute incremental recall.
@@ -245,9 +226,6 @@ class Base:
         target_scores = scores[target_i_indices]
 
         sorted_indices = np.argsort(target_scores)
-        if not self.is_positive_only:
-            # for explicit rating feedback, larger scores mean promising items
-            sorted_indices = sorted_indices[::-1]
 
         for i_index in target_i_indices[sorted_indices]:
             # already observed <user, item> pair is NOT recommended
