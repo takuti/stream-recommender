@@ -2,6 +2,7 @@
 
 from MovieLens1M import MovieLens1MConverter
 from MovieLens100k import MovieLens100kConverter
+from LastFM import LastFMConverter
 
 
 class Converter:
@@ -21,9 +22,10 @@ class Converter:
         """
         if dataset == 'ML1M':
             c = MovieLens1MConverter()
-            c.convert()
         elif dataset == 'ML100k':
             c = MovieLens100kConverter()
-            c.convert()
+        elif dataset == 'LastFM':
+            c = LastFMConverter()
 
+        c.convert()
         return c
