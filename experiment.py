@@ -96,9 +96,9 @@ class Runner:
                 n_item=self.data.n_item)
 
             if is_context_aware:
-                return partial_iFMs(contexts=self.data.contexts)
+                return partial_iFMs(contexts=self.data.contexts, max_dt=self.data.dts[-1])
             else:
-                return partial_iFMs(contexts=[])
+                return partial_iFMs(contexts=[], max_dt=0)
 
         model, res = self.__run(create)
 

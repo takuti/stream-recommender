@@ -33,8 +33,6 @@ class MovieLens1MConverter:
 
         self.samples = []
 
-        prev_date = datetime(*time.localtime(self.ratings[0, 3])[:6])
-
         head_date = datetime(*time.localtime(self.ratings[0, 3])[:6])
         self.dts = []
 
@@ -51,8 +49,8 @@ class MovieLens1MConverter:
 
             # delta days
             date = datetime(*time.localtime(timestamp)[:6])
-            dt = self.__delta(prev_date, date)
-            prev_date = date
+            dt = self.__delta(head_date, date)
+            self.dts.append(dt)
 
             # true value to compute gradient
             y = 1.
@@ -67,7 +65,6 @@ class MovieLens1MConverter:
             }
 
             self.samples.append(sample)
-            self.dts.append(self.__delta(head_date, date))
 
         self.n_user = len(user_ids)
         self.n_item = len(item_ids)

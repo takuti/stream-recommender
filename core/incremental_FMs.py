@@ -10,11 +10,12 @@ class IncrementalFMs(Base):
     """Incremental Factorization Machines
     """
 
-    def __init__(self, n_user, n_item, contexts, k=40, l2_reg_w0=.01, l2_reg_w=.01, l2_reg_V=30., learn_rate=.003):
+    def __init__(self, n_user, n_item, contexts, max_dt, k=40, l2_reg_w0=.01, l2_reg_w=.01, l2_reg_V=30., learn_rate=.003):
         self.n_user = n_user
         self.n_item = n_item
 
         self.contexts = contexts
+        self.max_dt = float(max_dt)
 
         self.p = n_user + n_item
         for ctx, dim in contexts:
@@ -46,7 +47,10 @@ class IncrementalFMs(Base):
         x[u_index] = x[self.n_user + i_index] = 1
 
         for ctx, dim in self.contexts:
-            x = np.append(x, d[ctx])
+            if ctx == 'dt':
+                x = np.append(x, d[ctx] / self.max_dt)
+            else:
+                x = np.append(x, d[ctx])
 
         x_vec = np.array([x]).T  # p x 1
         interaction = np.sum(np.dot(self.V.T, x_vec) ** 2 - np.dot(self.V.T ** 2, x_vec ** 2)) / 2.
@@ -61,7 +65,10 @@ class IncrementalFMs(Base):
         x[u_index] = x[self.n_user + i_index] = 1
 
         for ctx, dim in self.contexts:
-            x = np.append(x, d[ctx])
+            if ctx == 'dt':
+                x = np.append(x, d[ctx] / self.max_dt)
+            else:
+                x = np.append(x, d[ctx])
 
         x_vec = np.array([x]).T  # p x 1
         interaction = np.sum(np.dot(self.V.T, x_vec) ** 2 - np.dot(self.V.T ** 2, x_vec ** 2)) / 2.
@@ -151,11 +158,16 @@ class IncrementalFMs(Base):
         # for each context, extend the cancatenated arrays
         ctx_head = 0
         for ctx, dim in self.contexts:
-            row_ctx = np.array([])
-            data_ctx = np.array([])
-            for di in xrange(dim):
-                row_ctx = np.append(row_ctx, np.ones(self.n_item) * (self.n_user + self.n_item + ctx_head + di))
-                data_ctx = np.append(data_ctx, np.ones(self.n_item) * d[ctx][di])
+            if ctx == 'dt':
+                row_ctx = np.ones(self.n_item) * (self.n_user + self.n_item + ctx_head)
+                data_ctx = np.ones(self.n_item) * (d[ctx][0] / self.max_dt)
+            else:
+                row_ctx = np.array([])
+                data_ctx = np.array([])
+                for di in xrange(dim):
+                    row_ctx = np.append(row_ctx, np.ones(self.n_item) * (self.n_user + self.n_item + ctx_head + di))
+                    data_ctx = np.append(data_ctx, np.ones(self.n_item) * d[ctx][di])
+
             col_ctx = np.tile(np.arange(self.n_item), dim)
 
             row = np.append(row, row_ctx)
