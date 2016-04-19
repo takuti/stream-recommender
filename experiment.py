@@ -156,7 +156,7 @@ def save(path, avgs, time):
 
 import click
 
-models = ['baseline', 'iMF', 'biased-iMF', 'iFMs', 'all_MF', 'all_FMs']
+models = ['baseline', 'iMF', 'biased-iMF', 'iFMs']
 methods = ['recall', 'monitor']
 datasets = ['ML1M', 'ML100k', 'LastFM']
 
@@ -170,31 +170,15 @@ datasets = ['ML1M', 'ML100k', 'LastFM']
 def cli(model, method, dataset, context, n_epoch):
     exp = Runner(method=method, dataset=dataset, n_epoch=n_epoch)
 
-    if model == 'all_MF':
-        avgs, time = exp.iMF(is_static=True)
-        save('results/' + dataset + '_baseline_' + method + '.txt', avgs, time)
-
-        avgs, time = exp.iMF()
-        save('results/' + dataset + '_iMF_' + method + '.txt', avgs, time)
-
+    if model == 'baseline' or model == 'iMF':
+        avgs, time = exp.iMF(is_static=True) if model == 'baseline' else exp.iMF()
+    elif model == 'biased-iMF':
         avgs, time = exp.biased_iMF()
-        save('results/' + dataset + '_biased-iMF_' + method + '.txt', avgs, time)
-    elif model == 'all_FMs':
-        avgs, time = exp.iFMs(is_context_aware=False)
-        save('results/' + dataset + '_iFMs_no_context_' + method + '.txt', avgs, time)
+    elif model == 'iFMs':
+        model += ('_context_aware' if context else '_no_context')  # update output filename depending on contexts
+        avgs, time = exp.iFMs(is_context_aware=context)
 
-        avgs, time = exp.iFMs(is_context_aware=True)
-        save('results/' + dataset + '_iFMs_context_aware_' + method + '.txt', avgs, time)
-    else:
-        if model == 'baseline' or model == 'iMF':
-            avgs, time = exp.iMF(is_static=True) if model == 'baseline' else exp.iMF()
-        elif model == 'biased-iMF':
-            avgs, time = exp.biased_iMF()
-        elif model == 'iFMs':
-            model += ('_context_aware' if context else '_no_context')  # update output filename depending on contexts
-            avgs, time = exp.iFMs(is_context_aware=context)
-
-        save('results/%s_%s_%s.txt' % (dataset, model, method), avgs, time)
+    save('results/%s_%s_%s.txt' % (dataset, model, method), avgs, time)
 
 if __name__ == '__main__':
     cli()
