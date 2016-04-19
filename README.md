@@ -12,16 +12,18 @@ Takuya Kitazawa. **Incremental Factorization Machines for Item Recommendation in
 	- **iMF** &mdash; incremental matrix factorization
 	- **biased-iMF** &mdash; biased incremental matrix factorization
 	- **iFMs** &mdash; incremental factorization machines *(proposed)*
-	- **all_MF** &mdash; run **baseline**, **iMF** and **biased-iMF** at once
-	- **all_FMs** &mdash; run **iFMs** both of *w/o contextual variables* and *w/ all contextual variables*
-- **--context**, **-c**: choose contexts used by iFMs
-	- **dt** &mdash; elapsed days from the initial positive sample
-	- **genre** &mdash; movie genre
-	- **demographics** &mdash; users' demographics
-- **--limit**: restrict number of test samples
+- **--context**: choose whether contexts are used as a feature (bool)
+- **--method**: evaluation method
+	- **recall** &mdash; evaluate the later 50% (T=500)
+	- **monitor** &mdash; evaluate the later 70% (T=5000)
+- **--dataset**
+	- **ML1M** &mdash; positive samples in MovieLens 1M
+	- **ML100k** &mdash; positive samples in MovieLens 100k
+	- **LastFM** &mdash; subset of [the LastFM dataset](http://www.dtic.upf.edu/~ocelma/MusicRecommendationDataset/lastfm-1K.html)
+- **--n_epoch**: number of epochs in the batch pre-training
 
 Sample:
 
-	$ python experiment.py --model=iFMs -c genre -c dt -c demographics
+	$ python experiment.py --method=monitor --model=iFMs --dataset=ML1M --n_epoch=1 --context
 
 The results will be written text files under *results/*.
