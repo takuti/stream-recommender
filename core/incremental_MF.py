@@ -27,12 +27,6 @@ class IncrementalMF(Base):
         self.P = np.random.normal(0., 0.1, (self.n_user, self.k))
         self.Q = np.random.normal(0., 0.1, (self.n_item, self.k))
 
-    def _Base__predict(self, d):
-        u_vec = self.P[d['u_index']]
-        i_vec = self.Q[d['i_index']]
-
-        return np.inner(u_vec, i_vec)
-
     def _Base__update(self, d, is_batch_train=False):
         # static baseline; w/o updating the model
         if not is_batch_train and self.is_static:

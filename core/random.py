@@ -17,9 +17,6 @@ class Random(Base):
     def _Base__clear(self):
         self.observed = np.zeros((self.n_user, self.n_item))
 
-    def _Base__predict(self, d):
-        return np.random.rand()
-
     def _Base__update(self, d, is_batch_train=False):
         return
 

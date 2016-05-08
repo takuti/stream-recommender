@@ -166,19 +166,6 @@ class Base:
         pass
 
     @abstractmethod
-    def __predict(self, d):
-        """Make prediction for a sample 'd' using the current model parameters.
-
-        Args:
-            d (dict): A dictionary which has data of a sample.
-
-        Returns:
-            float: Predicted value.
-
-        """
-        return
-
-    @abstractmethod
     def __update(self, d, is_batch_train):
         """Update model parameters based on d, a sample represented as a dictionary.
 

@@ -38,24 +38,6 @@ class IncrementalFMs(Base):
         self.prev_w = np.array([])
         self.prev_V = np.array([])
 
-    def _Base__predict(self, d):
-        u_index = d['u_index']
-        i_index = d['i_index']
-
-        # create a sample vector and make prediction
-        x = np.zeros(self.n_user + self.n_item)
-        x[u_index] = x[self.n_user + i_index] = 1
-
-        for ctx, dim in self.contexts:
-            if ctx == 'dt':
-                x = np.append(x, d[ctx] / self.max_dt)
-            else:
-                x = np.append(x, d[ctx])
-
-        x_vec = np.array([x]).T  # p x 1
-        interaction = np.sum(np.dot(self.V.T, x_vec) ** 2 - np.dot(self.V.T ** 2, x_vec ** 2)) / 2.
-        return self.w0 + np.inner(self.w, x) + interaction
-
     def _Base__update(self, d, is_batch_train=False):
         u_index = d['u_index']
         i_index = d['i_index']
