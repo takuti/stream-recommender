@@ -65,7 +65,7 @@ class OnlineSketch:
         # define initial sketched matrix B
         self.B = np.dot(self.U, np.diag(s))
 
-        print '[log] initial sketch'
+        logger.debug('done: 30% initial sketching')
 
         # for further incremental evaluation,
         # the model is incrementally updated by using the 20% samples
@@ -77,7 +77,7 @@ class OnlineSketch:
 
                 self.__update(d)
 
-        print '[log] incremental update 20%'
+            logger.debug('done: 20% additional learning')
 
     def evaluate(self, test_samples, window_size=500, at=10):
         """Iterate recommend/update procedure and compute incremental recall.
@@ -91,7 +91,6 @@ class OnlineSketch:
             float: Avg. recommend+update time in second.
 
         """
-        test_samples = test_samples[:5000]
         n_test = len(test_samples)
         recalls = np.zeros(n_test)
 
@@ -101,7 +100,6 @@ class OnlineSketch:
         # start timer
         start = time.clock()
 
-        print '[log] start evaluate'
         for i, d in enumerate(test_samples):
             u_index = d['u_index']
             i_index = d['i_index']
