@@ -13,6 +13,7 @@ from functools import partial
 from core.incremental_MF import IncrementalMF
 from core.incremental_biasedMF import IncrementalBiasedMF
 from core.incremental_FMs import IncrementalFMs
+from core.online_sketch import OnlineSketch
 
 from converter.converter import Converter
 
@@ -110,6 +111,23 @@ class Runner:
 
         return res
 
+    def sketch(self):
+        """Online Matrix Sketching
+
+        Returns:
+            list of float values: Simple Moving Averages or avg. incrementalRecall.
+            float: average time to recommend/update for one sample
+
+        """
+        logger.debug('%s-based evaluation of online matrix sketching' % self.method)
+
+        def create():
+            return OnlineSketch(self.data.n_user, self.data.n_item)
+
+        model, res = self.__run(create)
+
+        return res
+
     def __run(self, callback):
         """Test runner.
 
@@ -156,7 +174,7 @@ def save(path, avgs, time):
 
 import click
 
-models = ['baseline', 'iMF', 'biased-iMF', 'iFMs']
+models = ['baseline', 'iMF', 'biased-iMF', 'iFMs', 'sketch']
 methods = ['recall', 'monitor']
 datasets = ['ML1M', 'ML100k', 'LastFM']
 
@@ -174,6 +192,8 @@ def cli(model, method, dataset, context, n_epoch):
         avgs, time = exp.iMF(is_static=True) if model == 'baseline' else exp.iMF()
     elif model == 'biased-iMF':
         avgs, time = exp.biased_iMF()
+    elif model == 'sketch':
+        avgs, time = exp.sketch()
     elif model == 'iFMs':
         model += ('_context_aware' if context else '_no_context')  # update output filename depending on contexts
         avgs, time = exp.iFMs(is_context_aware=context)
