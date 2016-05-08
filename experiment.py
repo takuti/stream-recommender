@@ -14,6 +14,7 @@ from core.incremental_MF import IncrementalMF
 from core.incremental_biasedMF import IncrementalBiasedMF
 from core.incremental_FMs import IncrementalFMs
 from core.online_sketch import OnlineSketch
+from core.random import Random
 
 from converter.converter import Converter
 
@@ -128,6 +129,23 @@ class Runner:
 
         return res
 
+    def random(self):
+        """Random baseline
+
+        Returns:
+            list of float values: Simple Moving Averages or avg. incrementalRecall.
+            float: average time to recommend/update for one sample
+
+        """
+        logger.debug('%s-based evaluation of random baseline' % self.method)
+
+        def create():
+            return Random(self.data.n_user, self.data.n_item)
+
+        model, res = self.__run(create)
+
+        return res
+
     def __run(self, callback):
         """Test runner.
 
@@ -174,7 +192,7 @@ def save(path, avgs, time):
 
 import click
 
-models = ['baseline', 'iMF', 'biased-iMF', 'iFMs', 'sketch']
+models = ['baseline', 'iMF', 'biased-iMF', 'iFMs', 'sketch', 'random']
 methods = ['recall', 'monitor']
 datasets = ['ML1M', 'ML100k', 'LastFM']
 
@@ -194,6 +212,8 @@ def cli(model, method, dataset, context, n_epoch):
         avgs, time = exp.biased_iMF()
     elif model == 'sketch':
         avgs, time = exp.sketch()
+    elif model == 'random':
+        avgs, time = exp.random()
     elif model == 'iFMs':
         model += ('_context_aware' if context else '_no_context')  # update output filename depending on contexts
         avgs, time = exp.iFMs(is_context_aware=context)
