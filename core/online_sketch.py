@@ -5,14 +5,15 @@ handler.setLevel(DEBUG)
 logger.setLevel(DEBUG)
 logger.addHandler(handler)
 
-import time
+from base import Base
+
 import numpy as np
 import numpy.linalg as ln
 import scipy.sparse as sp
 from sklearn.utils.extmath import safe_sparse_dot
 
 
-class OnlineSketch:
+class OnlineSketch(Base):
 
     """Inspired by: Streaming Anomaly Detection using Online Matrix Sketching
     """
@@ -31,8 +32,10 @@ class OnlineSketch:
         self.m = n_user + n_item
         self.ell = int(np.sqrt(self.m))
 
-        self.__clear()
+        self._Base__clear()
 
+    # Since a batch training procedure is totally different from the matrix factorization techniques,
+    # a public method "fit" is overridden.
     def fit(self, train_samples, test_samples, n_epoch=1, at=10, is_monitoring=False):
         """Learn the "positve" sketched matrix using the first 30% positive samples to avoid cold-start.
 
@@ -75,67 +78,11 @@ class OnlineSketch:
                 i_index = d['i_index']
                 self.observed[u_index, i_index] = 1
 
-                self.__update(d)
+                self._Base__update(d)
 
             logger.debug('done: 20% additional learning')
 
-    def evaluate(self, test_samples, window_size=500, at=10):
-        """Iterate recommend/update procedure and compute incremental recall.
-
-        Args:
-            test_samples (list of dict): Positive test samples.
-            at (int): Top-{at} items will be recommended in each iteration.
-
-        Returns:
-            float: incremental recalls@{at}.
-            float: Avg. recommend+update time in second.
-
-        """
-        n_test = len(test_samples)
-        recalls = np.zeros(n_test)
-
-        window = np.zeros(window_size)
-        sum_window = 0.
-
-        # start timer
-        start = time.clock()
-
-        for i, d in enumerate(test_samples):
-            u_index = d['u_index']
-            i_index = d['i_index']
-
-            self.observed[u_index, i_index] = 0
-
-            # 1000 further unobserved items + item i interacted by user u
-            unobserved_i_indices = np.where(self.observed[u_index, :] == 0)[0]
-            n_unobserved = unobserved_i_indices.size
-            target_i_indices = np.random.choice(unobserved_i_indices, min(n_unobserved, 1000), replace=False)
-
-            # make top-{at} recommendation for the 1001 items
-            recos = self.__recommend(d, target_i_indices, at)
-
-            self.observed[u_index, i_index] = 1
-
-            # increment a hit counter if i_index is in the top-{at} recommendation list
-            # i.e. score the recommendation list based on the true observed item
-            wi = i % window_size
-
-            old_recall = window[wi]
-            new_recall = 1. if (i_index in recos) else 0.
-            window[wi] = new_recall
-
-            sum_window = sum_window - old_recall + new_recall
-            recalls[i] = sum_window / min(i + 1, window_size)
-
-            # Step 2: update the model with the observed event
-            self.__update(d)
-
-        # stop timer
-        avg_time = (time.clock() - start) / n_test
-
-        return recalls, avg_time
-
-    def __clear(self):
+    def _Base__clear(self):
         """Initialize model parameters.
 
         Observed flag array should be zero-cleared.
@@ -143,7 +90,7 @@ class OnlineSketch:
         """
         self.observed = np.zeros((self.n_user, self.n_item))
 
-    def __update(self, d, is_batch_train=False):
+    def _Base__update(self, d, is_batch_train=False):
         # static baseline; w/o updating the model
         if not is_batch_train:
             return
@@ -172,7 +119,7 @@ class OnlineSketch:
 
         self.B = np.dot(self.U, np.diag(s))
 
-    def __recommend(self, d, target_i_indices, at=10):
+    def _Base__recommend(self, d, target_i_indices, at=10):
         u_index = d['u_index']
 
         # (n_user, n_item); user of d's row has 1s
@@ -196,33 +143,4 @@ class OnlineSketch:
         A = safe_sparse_dot(X, Y, dense_output=True)
         scores = ln.norm(A, axis=0, ord=2)
 
-        return self.__scores2recos(u_index, scores, target_i_indices, at)
-
-    def __scores2recos(self, u_index, scores, target_i_indices, at):
-        """Get top-{at} recommendation list for a user u_index based on scores.
-
-        Args:
-            u_index (int): Target user's index.
-            scores (numpy array; (n_item,)): Scores for every items. Smaller score indicates a promising item.
-            target_i_indices (numpy array; (# target items, )): Target items' indices. Only these items are considered as the recommendation candidates.
-            at (int): Top-{at} items will be recommended.
-
-        Returns:
-            numpy array (at,): Recommendation list; top-{at} item indices.
-
-        """
-        recos = np.array([])
-        target_scores = scores[target_i_indices]
-
-        sorted_indices = np.argsort(target_scores)
-
-        for i_index in target_i_indices[sorted_indices]:
-            # already observed <user, item> pair is NOT recommended
-            if self.observed[u_index, i_index] == 1:
-                continue
-
-            recos = np.append(recos, i_index)
-            if recos.size == at:
-                break
-
-        return recos.astype(int)
+        return self._Base__scores2recos(u_index, scores, target_i_indices, at)
