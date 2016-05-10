@@ -19,21 +19,19 @@ class Base:
     __metaclass__ = ABCMeta
 
     @abstractmethod
-    def __init__(self, n_user, n_item, **params):
+    def __init__(self, n_item, **params):
         """Set/initialize parameters.
 
         Args:
-            n_user (int): Number of users.
-            n_item (int): Number of items.
+            n_item (int): Number of pre-defined items.
 
         """
-        self.n_user = n_user
         self.n_item = n_item
 
         # set parameters
         self.params = params
 
-        # initialize models
+        # initialize models and user/item information
         self.__clear()
 
     def fit(self, train_samples, test_samples, at=10, n_epoch=1, is_monitoring=False):
@@ -51,31 +49,56 @@ class Base:
         """
         self.__clear()
 
+        # make initial status for batch training
+        for d in train_samples:
+            self.__check(d)
+            self.users[d['u_index']]['observed'].add(d['i_index'])
+
+        # for batch evaluation, temporarily save new users/items info
+        temporary_users = []
+        for d in test_samples:
+            u_index = d['u_index']
+
+            if u_index not in self.users:
+                temporary_users.append(u_index)
+
+            self.__check(d)
+
+        self.batch_update(train_samples, test_samples, at, n_epoch)
+
+        # for further incremental evaluation,
+        # the model is incrementally updated by using the 20% samples
+        if not is_monitoring:
+            for d in test_samples:
+                self.users[d['u_index']]['observed'].add(d['i_index'])
+                self.__update(d)
+        else:
+            # delete temporary items and users
+            self.n_user -= len(temporary_users)
+            for u_index in temporary_users:
+                del self.users[u_index]
+
+    def batch_update(self, train_samples, test_samples, at, n_epoch):
+        """Batch update called by the fitting method.
+
+        Args:
+            train_samples (list of dict): Positive training samples (0-30%).
+            test_sample (list of dict): Test samples (30-50%).
+            at (int): Evaluation metric of this batch pre-training will be recall@{at}.
+            n_epoch (int): Number of epochs for the batch training.
+
+        """
         for epoch in range(n_epoch):
             # SGD requires us to shuffle samples in each iteration
             np.random.shuffle(train_samples)
 
             # 30%: update models
             for d in train_samples:
-                u_index = d['u_index']
-                i_index = d['i_index']
-                self.observed[u_index, i_index] = 1
-
                 self.__update(d, is_batch_train=True)
 
             # 20%: evaluate the current model
             recall = self.batch_evaluate(test_samples, at)
             logger.debug('epoch %2d: recall@%d = %f' % (epoch + 1, at, recall))
-
-        # for further incremental evaluation,
-        # the model is incrementally updated by using the 20% samples
-        if not is_monitoring:
-            for d in test_samples:
-                u_index = d['u_index']
-                i_index = d['i_index']
-                self.observed[u_index, i_index] = 1
-
-                self.__update(d)
 
     def batch_evaluate(self, test_samples, at):
         """Evaluate the current model by using the given test samples.
@@ -89,9 +112,13 @@ class Base:
         """
         n_tp = 0
 
+        all_items = set(range(self.n_item))
         for i, d in enumerate(test_samples):
-            # make recommendation for all items
-            recos = self.__recommend(d, np.arange(self.n_item), at)
+            # make recommendation for all unobserved items
+            unobserved = all_items - self.users[d['u_index']]['observed']
+            unobserved.add(d['i_index'])  # true item itself must be in the recommendation candidates
+            target_i_indices = np.asarray(list(unobserved))
+            recos = self.__recommend(d, target_i_indices, at)
 
             # is a true sample in the top-{at} recommendation list?
             if d['i_index'] in recos:
@@ -120,21 +147,21 @@ class Base:
         # start timer
         start = time.clock()
 
+        all_items = set(range(self.n_item))
         for i, d in enumerate(test_samples):
+            self.__check(d)
+
             u_index = d['u_index']
             i_index = d['i_index']
 
-            self.observed[u_index, i_index] = 0
-
-            # 1000 further unobserved items + item i interacted by user u
-            unobserved_i_indices = np.where(self.observed[u_index, :] == 0)[0]
-            n_unobserved = unobserved_i_indices.size
-            target_i_indices = np.random.choice(unobserved_i_indices, min(n_unobserved, 1000), replace=False)
+            # unobserved items
+            # * item i interacted by user u must be in the recommendation candidate
+            unobserved = all_items - self.users[u_index]['observed']
+            unobserved.add(i_index)
+            target_i_indices = np.asarray(list(unobserved))
 
             # make top-{at} recommendation for the 1001 items
             recos = self.__recommend(d, target_i_indices, at)
-
-            self.observed[u_index, i_index] = 1
 
             # increment a hit counter if i_index is in the top-{at} recommendation list
             # i.e. score the recommendation list based on the true observed item
@@ -148,6 +175,7 @@ class Base:
             recalls[i] = sum_window / min(i + 1, window_size)
 
             # Step 2: update the model with the observed event
+            self.users[u_index]['observed'].add(i_index)
             self.__update(d)
 
         # stop timer
@@ -157,12 +185,26 @@ class Base:
 
     @abstractmethod
     def __clear(self):
-        """Initialize model parameters.
-
-        Observed flag array should be zero-cleared.
+        """Initialize model parameters and user/item info.
 
         """
-        self.observed = np.zeros((self.n_user, self.n_item))
+        self.n_user = 0
+        self.users = {}
+        pass
+
+    @abstractmethod
+    def __check(self, d):
+        """Check if user/item is new.
+
+        For new users/items, append their information into the dictionaries.
+
+        """
+        u_index = d['u_index']
+
+        if u_index not in self.users:
+            self.users[u_index] = {'observed': set()}
+            self.n_user += 1
+
         pass
 
     @abstractmethod
@@ -173,9 +215,6 @@ class Base:
             d (dict): A dictionary which has data of a sample.
 
         """
-        u_index = d['u_index']
-        i_index = d['i_index']
-        self.observed[u_index, i_index] = 1
         pass
 
     @abstractmethod
@@ -196,12 +235,12 @@ class Base:
         """
         return
 
-    def __scores2recos(self, u_index, scores, target_i_indices, at):
+    def __scores2recos(self, scores, target_i_indices, at):
         """Get top-{at} recommendation list for a user u_index based on scores.
 
         Args:
-            u_index (int): Target user's index.
-            scores (numpy array; (n_item,)): Scores for every items. Smaller score indicates a promising item.
+            scores (numpy array; (n_target_items,)):
+                Scores for the target items. Smaller score indicates a promising item.
             target_i_indices (numpy array; (# target items, )): Target items' indices. Only these items are considered as the recommendation candidates.
             at (int): Top-{at} items will be recommended.
 
@@ -209,18 +248,6 @@ class Base:
             numpy array (at,): Recommendation list; top-{at} item indices.
 
         """
-        recos = np.array([])
-        target_scores = scores[target_i_indices]
 
-        sorted_indices = np.argsort(target_scores)
-
-        for i_index in target_i_indices[sorted_indices]:
-            # already observed <user, item> pair is NOT recommended
-            if self.observed[u_index, i_index] == 1:
-                continue
-
-            recos = np.append(recos, i_index)
-            if recos.size == at:
-                break
-
-        return recos.astype(int)
+        sorted_indices = np.argsort(scores)
+        return target_i_indices[sorted_indices][:at]

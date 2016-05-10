@@ -8,8 +8,7 @@ class IncrementalMF(Base):
     """Incremental Matrix Factorization
     """
 
-    def __init__(self, n_user, n_item, is_static=False, k=40, l2_reg=.01, learn_rate=.003):
-        self.n_user = n_user
+    def __init__(self, n_item, is_static=False, k=40, l2_reg=.01, learn_rate=.003):
         self.n_item = n_item
 
         # if True, parameters will not be updated in evaluation
@@ -23,9 +22,17 @@ class IncrementalMF(Base):
         self._Base__clear()
 
     def _Base__clear(self):
-        self.observed = np.zeros((self.n_user, self.n_item))
-        self.P = np.random.normal(0., 0.1, (self.n_user, self.k))
+        self.n_user = 0
+        self.users = {}
+
         self.Q = np.random.normal(0., 0.1, (self.n_item, self.k))
+
+    def _Base__check(self, d):
+        u_index = d['u_index']
+
+        if u_index not in self.users:
+            self.users[u_index] = {'vec': np.random.normal(0., 0.1, self.k), 'observed': set()}
+            self.n_user += 1
 
     def _Base__update(self, d, is_batch_train=False):
         # static baseline; w/o updating the model
@@ -35,20 +42,18 @@ class IncrementalMF(Base):
         u_index = d['u_index']
         i_index = d['i_index']
 
-        u_vec = self.P[u_index]
+        u_vec = self.users[u_index]['vec']
         i_vec = self.Q[i_index]
 
         err = d['y'] - np.inner(u_vec, i_vec)
 
         next_u_vec = u_vec + 2. * self.learn_rate * (err * i_vec - self.l2_reg_u * u_vec)
         next_i_vec = i_vec + 2. * self.learn_rate * (err * u_vec - self.l2_reg_i * i_vec)
-        self.P[u_index] = next_u_vec
+        self.users[u_index]['vec'] = next_u_vec
         self.Q[i_index] = next_i_vec
 
     def _Base__recommend(self, d, target_i_indices, at=10):
-        u_index = d['u_index']
+        pred = np.dot(self.users[d['u_index']]['vec'], self.Q[target_i_indices, :].T)
+        scores = np.abs(1. - pred.reshape(len(target_i_indices)))
 
-        pred = np.dot(self.P[u_index], self.Q.T)
-        scores = np.abs(1. - pred.reshape(self.n_item))
-
-        return self._Base__scores2recos(u_index, scores, target_i_indices, at)
+        return self._Base__scores2recos(scores, target_i_indices, at)
