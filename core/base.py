@@ -34,7 +34,7 @@ class Base:
         # initialize models and user/item information
         self.__clear()
 
-    def fit(self, train_samples, test_samples, at=10, n_epoch=1, is_monitoring=False):
+    def fit(self, train_samples, test_samples, at=10, n_epoch=1):
         """Train a model using the first 30% positive samples to avoid cold-start.
 
         Evaluation of this batch training is done by using the next 20% positive samples.
@@ -66,17 +66,10 @@ class Base:
 
         self.batch_update(train_samples, test_samples, at, n_epoch)
 
-        # for further incremental evaluation,
-        # the model is incrementally updated by using the 20% samples
-        if not is_monitoring:
-            for d in test_samples:
-                self.users[d['u_index']]['observed'].add(d['i_index'])
-                self.__update(d)
-        else:
-            # delete temporary items and users
-            self.n_user -= len(temporary_users)
-            for u_index in temporary_users:
-                del self.users[u_index]
+        # delete temporary items and users
+        self.n_user -= len(temporary_users)
+        for u_index in temporary_users:
+            del self.users[u_index]
 
     def batch_update(self, train_samples, test_samples, at, n_epoch):
         """Batch update called by the fitting method.
@@ -126,7 +119,7 @@ class Base:
 
         return float(n_tp) / len(test_samples)
 
-    def evaluate(self, test_samples, window_size=500, at=10):
+    def evaluate(self, test_samples, window_size=5000, at=10):
         """Iterate recommend/update procedure and compute incremental recall.
 
         Args:
