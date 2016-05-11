@@ -18,42 +18,42 @@ class OnlineSketch(Base):
     """Inspired by: Streaming Anomaly Detection using Online Matrix Sketching
     """
 
-    def __init__(self, n_user, n_item):
-        """Set/initialize parameters.
-
-        Args:
-            n_user (int): Number of users.
-            n_item (int): Number of items.
-
-        """
-        self.n_user = n_user
+    def __init__(self, n_item, samples, contexts):
         self.n_item = n_item
 
-        self.m = n_user + n_item
-        self.ell = int(np.sqrt(self.m))
+        self.contexts = contexts
+        self.p = np.sum(contexts.values())
+        self.ell = int(np.sqrt(self.p))
+
+        # create item matrices which has contexts of each item in rows
+        self.i_mat = self.__create_i_mat(samples)
 
         self._Base__clear()
 
     # Since a batch training procedure is totally different from the matrix factorization techniques,
     # a public method "fit" is overridden.
-    def fit(self, train_samples, test_samples, n_epoch=1, at=10, is_monitoring=False):
+    def fit(self, train_samples, test_samples, n_epoch=1, at=10):
         """Learn the "positve" sketched matrix using the first 30% positive samples to avoid cold-start.
 
         Args:
-            train_samples (list of dict): Positive training samples (0-30%).
-            test_sample (list of dict): Test samples (30-50%).
+            train_samples (list of dict): Positive training samples (0-20%).
+            test_sample (list of dict): Test samples (20-30%).
             at (int): Evaluation metric of this batch pre-training will be recall@{at}.
             n_epoch (int): Number of epochs for the batch training. (fixed by 1)
 
         """
-        Y0 = np.zeros((self.m, len(train_samples)))
+        Y0 = np.zeros((self.p, len(train_samples)))
 
-        # 30%: update models
+        # 20%: update models
         for i, d in enumerate(train_samples):
-            u_index = d['u_index']
-            i_index = d['i_index']
+            self._Base__check(d)
+            self.users[d['u_index']]['observed'].add(d['i_index'])
 
-            Y0[u_index, i] = Y0[self.n_user + i_index, i] = 1
+            y = d['user']
+            y = np.append(y, d['item'])
+            y = np.append(y, d['dt'])
+
+            Y0[:, i] = y
 
         # initial ell orthogonal bases are computed by truncated SVD
         U, s, V = ln.svd(Y0, full_matrices=False)
@@ -68,45 +68,40 @@ class OnlineSketch(Base):
         # define initial sketched matrix B
         self.B = np.dot(self.U, np.diag(s))
 
-        logger.debug('done: 30% initial sketching')
+        logger.debug('done: 20% initial sketching')
 
         # for further incremental evaluation,
-        # the model is incrementally updated by using the 20% samples
-        if not is_monitoring:
-            for d in test_samples:
-                u_index = d['u_index']
-                i_index = d['i_index']
-                self.observed[u_index, i_index] = 1
+        # the model is incrementally updated by using the 10% samples
+        for d in test_samples:
+            self._Base__check(d)
+            self.users[d['u_index']]['observed'].add(d['i_index'])
 
-                self._Base__update(d)
+            self._Base__update(d)
 
-            logger.debug('done: 20% additional learning')
+        logger.debug('done: additional learning for the 10% batch test samples')
 
     def _Base__clear(self):
-        """Initialize model parameters.
+        self.n_user = 0
+        self.users = {}
 
-        Observed flag array should be zero-cleared.
+        self.B = np.random.normal(0., 0.1, (self.p, self.ell))
 
-        """
-        self.observed = np.zeros((self.n_user, self.n_item))
+    def _Base__check(self, d):
+        u_index = d['u_index']
+
+        if u_index not in self.users:
+            self.users[u_index] = {'observed': set()}
+            self.n_user += 1
 
     def _Base__update(self, d, is_batch_train=False):
-        # static baseline; w/o updating the model
-        if not is_batch_train:
-            return
-
-        u_index = d['u_index']
-        i_index = d['i_index']
-        self.observed[u_index, i_index] = 1
-
-        y = np.zeros((self.m, 1))
-        y[u_index] = y[self.n_user + i_index] = 1.
+        y = d['user']
+        y = np.append(y, d['item'])
+        y = np.append(y, d['dt'])
 
         # combine current sketched matrix with input at time t
-        # D: m-by-(ell+1) matrix
-        D = np.hstack((self.B, y))
+        self.B[:, (self.ell - 1)] = y
 
-        U, s, V = ln.svd(D, full_matrices=False)
+        U, s, V = ln.svd(self.B, full_matrices=False)
 
         # update ell orthogonal bases
         self.U = U[:, :self.ell]
@@ -120,27 +115,44 @@ class OnlineSketch(Base):
         self.B = np.dot(self.U, np.diag(s))
 
     def _Base__recommend(self, d, target_i_indices, at=10):
-        u_index = d['u_index']
+        # i_mat is (n_item_context, n_item) for all possible items
 
-        # (n_user, n_item); user of d's row has 1s
-        row_upper = np.ones(self.n_item) * u_index
-        col_upper = np.arange(self.n_item)
-        data_upper = np.ones(self.n_item)
+        # u_mat will be (n_user_context, n_item) for the target user
+        u_mat = np.repeat(np.array([d['user']]).T, self.n_item, axis=1)
 
-        # (n_item, n_item); identity matrix
-        row_lower = np.arange(self.n_user, self.n_user + self.n_item)
-        col_lower = np.arange(self.n_item)
-        data_lower = np.ones(self.n_item)
+        # dt_mat will be (1, n_item) for the target user
+        dt_mat = np.repeat(d['dt'], self.n_item)
 
-        # concat
-        row = np.append(row_upper, row_lower)
-        col = np.append(col_upper, col_lower)
-        data = np.append(data_upper, data_lower)
+        # stack them into (p, n_item) matrix
+        Y = sp.csr_matrix(np.vstack((u_mat, self.i_mat, dt_mat))[:, target_i_indices])
 
-        X = np.identity(self.m) - np.dot(self.U, self.U.T)
-        Y = sp.csr_matrix((data, (row, col)), shape=(self.m, self.n_item))
-
+        X = np.identity(self.p) - np.dot(self.U, self.U.T)
         A = safe_sparse_dot(X, Y, dense_output=True)
+
         scores = ln.norm(A, axis=0, ord=2)
 
-        return self._Base__scores2recos(u_index, scores, target_i_indices, at)
+        return self._Base__scores2recos(scores, target_i_indices, at)
+
+    def __create_i_mat(self, samples):
+        """Create an item matrix which has contexts of each item in rows.
+
+        Args:
+            samples (list of dict): Each sample has an item vector.
+
+        Returns:
+            numpy array (n_item_context, n_item): Column is an item vector.
+
+        """
+        i_mat = np.zeros((self.n_item, self.contexts['item']))
+        observed = np.zeros(self.n_item)
+
+        for d in samples:
+            i_index = d['i_index']
+
+            if observed[i_index] == 1:
+                continue
+
+            i_mat[i_index, :] = d['item']
+            observed[i_index] = 1
+
+        return i_mat.T
