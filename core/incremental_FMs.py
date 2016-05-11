@@ -10,16 +10,16 @@ class IncrementalFMs(Base):
     """Incremental Factorization Machines
     """
 
-    def __init__(self, n_user, n_item, contexts, max_dt, k=40, l2_reg_w0=.01, l2_reg_w=.01, l2_reg_V=30., learn_rate=.003):
-        self.n_user = n_user
+    def __init__(
+            self, n_item, samples, contexts, k=40, l2_reg_w0=.01, l2_reg_w=.01, l2_reg_V=30., learn_rate=.003):
+
         self.n_item = n_item
 
         self.contexts = contexts
-        self.max_dt = float(max_dt)
+        self.p = np.sum(contexts.values())
 
-        self.p = n_user + n_item
-        for ctx, dim in contexts:
-            self.p += dim
+        # create item matrices which has contexts of each item in rows
+        self.i_mat = self.__create_i_mat(samples)
 
         self.k = k
         self.l2_reg_w0 = l2_reg_w0
@@ -30,27 +30,31 @@ class IncrementalFMs(Base):
         self._Base__clear()
 
     def _Base__clear(self):
-        self.observed = np.zeros((self.n_user, self.n_item))
-        self.w0 = 0.
-        self.w = np.zeros(self.p)
+        self.n_user = 0
+        self.users = {}
+
+        # initial parameters from Gaussian
+        self.w0 = np.random.normal(0., 0.1, 1)
+        self.w = np.random.normal(0., 0.1, self.p)
         self.V = np.random.normal(0., 0.1, (self.p, self.k))
+
+        # to keep the last parameters for adaptive regularization
         self.prev_w0 = float('inf')
         self.prev_w = np.array([])
         self.prev_V = np.array([])
 
-    def _Base__update(self, d, is_batch_train=False):
+    def _Base__check(self, d):
         u_index = d['u_index']
-        i_index = d['i_index']
 
+        if u_index not in self.users:
+            self.users[u_index] = {'observed': set()}
+            self.n_user += 1
+
+    def _Base__update(self, d, is_batch_train=False):
         # create a sample vector and make prediction
-        x = np.zeros(self.n_user + self.n_item)
-        x[u_index] = x[self.n_user + i_index] = 1
-
-        for ctx, dim in self.contexts:
-            if ctx == 'dt':
-                x = np.append(x, d[ctx] / self.max_dt)
-            else:
-                x = np.append(x, d[ctx])
+        x = d['user']
+        x = np.append(x, d['item'])
+        x = np.append(x, d['dt'])
 
         x_vec = np.array([x]).T  # p x 1
         interaction = np.sum(np.dot(self.V.T, x_vec) ** 2 - np.dot(self.V.T ** 2, x_vec ** 2)) / 2.
@@ -93,69 +97,52 @@ class IncrementalFMs(Base):
             self.V[pi] = self.prev_V[pi] + 2. * self.learn_rate * (g - self.l2_reg_V * self.prev_V[pi])
 
     def _Base__recommend(self, d, target_i_indices, at=10):
-        # i_mat is (p, n_item) for all possible pairs of the user (d['u_index']) and all items
-        i_mat = self.__create_i_mat(d)
+        # i_mat is (n_item_context, n_item) for all possible items
+
+        # u_mat will be (n_user_context, n_item) for the target user
+        u_mat = np.repeat(np.array([d['user']]).T, self.n_item, axis=1)
+
+        # dt_mat will be (1, n_item) for the target user
+        dt_mat = np.repeat(d['dt'], self.n_item)
+
+        # stack them into (p, n_item) matrix
+        mat = sp.csr_matrix(np.vstack((u_mat, self.i_mat, dt_mat))[:, target_i_indices])
 
         # Matrix A and B should be dense (numpy array; rather than scipy CSR matrix) because V is dense.
-        A = safe_sparse_dot(self.V.T, i_mat)
+        A = safe_sparse_dot(self.V.T, mat)
         A = A ** 2
 
-        sq_i_mat = i_mat.copy()
-        sq_i_mat.data[:] = sq_i_mat.data ** 2
-        B = safe_sparse_dot(self.V.T ** 2, sq_i_mat)
+        sq_mat = mat.copy()
+        sq_mat.data[:] = sq_mat.data ** 2
+        B = safe_sparse_dot(self.V.T ** 2, sq_mat)
 
         interaction = np.sum(A - B, 0)
         interaction /= 2.  # (n_item,)
 
-        pred = self.w0 + safe_sparse_dot(self.w, i_mat, dense_output=True) + interaction
+        pred = self.w0 + safe_sparse_dot(self.w, mat, dense_output=True) + interaction
         scores = np.abs(1. - (pred[:self.n_item] + np.sum(pred[self.n_item:])))
 
-        return self._Base__scores2recos(d['u_index'], scores, target_i_indices, at)
+        return self._Base__scores2recos(scores, target_i_indices, at)
 
-    def __create_i_mat(self, d):
-        """Create a matrix which covers all possible <user, item> pairs for a given user index.
+    def __create_i_mat(self, samples):
+        """Create an item matrix which has contexts of each item in rows.
 
         Args:
-            d (dict): A dictionary which has data of a sample.
+            samples (list of dict): Each sample has an item vector.
 
         Returns:
-            scipy csr_matrix (p, n_item): Column is a vector of <d['u_index'], item>.
+            numpy array (n_item_context, n_item): Column is an item vector.
 
         """
-        # (n_user, n_item); user of d's row has 1s
-        row_upper = np.ones(self.n_item) * d['u_index']
-        col_upper = np.arange(self.n_item)
-        data_upper = np.ones(self.n_item)
+        i_mat = np.zeros((self.n_item, self.contexts['item']))
+        observed = np.zeros(self.n_item)
 
-        # (n_item, n_item); identity matrix
-        row_lower = np.arange(self.n_user, self.n_user + self.n_item)
-        col_lower = np.arange(self.n_item)
-        data_lower = np.ones(self.n_item)
+        for d in samples:
+            i_index = d['i_index']
 
-        # concat
-        row = np.append(row_upper, row_lower)
-        col = np.append(col_upper, col_lower)
-        data = np.append(data_upper, data_lower)
+            if observed[i_index] == 1:
+                continue
 
-        # for each context, extend the cancatenated arrays
-        ctx_head = 0
-        for ctx, dim in self.contexts:
-            if ctx == 'dt':
-                row_ctx = np.ones(self.n_item) * (self.n_user + self.n_item + ctx_head)
-                data_ctx = np.ones(self.n_item) * (d[ctx][0] / self.max_dt)
-            else:
-                row_ctx = np.array([])
-                data_ctx = np.array([])
-                for di in xrange(dim):
-                    row_ctx = np.append(row_ctx, np.ones(self.n_item) * (self.n_user + self.n_item + ctx_head + di))
-                    data_ctx = np.append(data_ctx, np.ones(self.n_item) * d[ctx][di])
+            i_mat[i_index, :] = d['item']
 
-            col_ctx = np.tile(np.arange(self.n_item), dim)
-
-            row = np.append(row, row_ctx)
-            col = np.append(col, col_ctx)
-            data = np.append(data, data_ctx)
-
-            ctx_head += dim
-
-        return sp.csr_matrix((data, (row, col)), shape=(self.p, self.n_item))
+        return i_mat.T

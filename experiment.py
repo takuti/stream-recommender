@@ -8,7 +8,6 @@ logger.setLevel(DEBUG)
 logger.addHandler(handler)
 
 import numpy as np
-from functools import partial
 
 from core.incremental_MF import IncrementalMF
 from core.incremental_FMs import IncrementalFMs
@@ -72,14 +71,10 @@ class Runner:
         logger.debug('# iFMs')
 
         def create():
-            partial_iFMs = partial(
-                IncrementalFMs,
-                n_item=self.data.n_item)
-
-            if is_context_aware:
-                return partial_iFMs(contexts=self.data.contexts)
-            else:
-                return partial_iFMs(contexts=[])
+            return IncrementalFMs(
+                n_item=self.data.n_item,
+                samples=self.data.samples,
+                contexts=self.data.contexts)
 
         model, res = self.__run(create)
 
@@ -168,10 +163,9 @@ datasets = ['ML1M', 'ML100k', 'LastFM']
 @click.command()
 @click.option('--model', type=click.Choice(models), default=models[0], help='Choose a factorization model')
 @click.option('--dataset', type=click.Choice(datasets), default=datasets[0], help='Choose a dataset')
-@click.option('--context/--no-context', default=False, help='Choose whether a feature vector for iFMs incorporates contextual variables.')
 @click.option('--window_size', default=5000, help='Window size of the simple moving average for incremental evaluation.')
 @click.option('--n_epoch', default=1, help='Number of epochs for batch training.')
-def cli(model, dataset, context, window_size, n_epoch):
+def cli(model, dataset, window_size, n_epoch):
     exp = Runner(dataset=dataset, window_size=window_size, n_epoch=n_epoch)
 
     if model == 'static-MF' or model == 'iMF':
@@ -181,8 +175,7 @@ def cli(model, dataset, context, window_size, n_epoch):
     elif model == 'random':
         avgs, time = exp.random()
     elif model == 'iFMs':
-        model += ('_context_aware' if context else '_no_context')  # update output filename depending on contexts
-        avgs, time = exp.iFMs(is_context_aware=context)
+        avgs, time = exp.iFMs()
 
     save('results/%s_%s_%s.txt' % (dataset, model, window_size), avgs, time)
 

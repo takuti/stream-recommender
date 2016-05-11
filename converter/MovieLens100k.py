@@ -17,7 +17,7 @@ class MovieLens100kConverter:
 
         # contexts in this dataset
         # 1 delta time, 18 genres, and 23 demographics (1 for M/F, 1 for age, 21 for occupation(0-20))
-        self.contexts = [('dt', 1), ('genre', 18), ('demographics', 23)]
+        self.contexts = {'dt': 1, 'item': 18, 'user': 23}
 
     def convert(self):
         """Create a list of samples and count number of users/items.
@@ -60,8 +60,8 @@ class MovieLens100kConverter:
                 'u_index': u_index,
                 'i_index': i_index,
                 'dt': np.array([dt]),
-                'genre': movies[item_id],
-                'demographics': users[user_id]
+                'item': movies[item_id],
+                'user': users[user_id]
             }
 
             self.samples.append(sample)
