@@ -144,5 +144,6 @@ class IncrementalFMs(Base):
                 continue
 
             i_mat[i_index, :] = d['item']
+            observed[i_index] = 1
 
         return i_mat.T
