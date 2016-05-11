@@ -29,7 +29,7 @@ class Runner:
         self.data = Converter().convert(dataset=dataset)
 
         logger.debug('[exp] %s | window_size = %d, n_epoch = %d' % (dataset, window_size, n_epoch))
-        logger.debug('[exp] n_sample = %d; %d (30%%) + %d (20%%) + %d (50%%)' % (
+        logger.debug('[exp] n_sample = %d; %d (20%%) + %d (10%%) + %d (70%%)' % (
             self.data.n_sample, self.data.n_batch_train, self.data.n_batch_test, self.data.n_test))
         logger.debug('[exp] n_user = %d, n_item = %d' % (self.data.n_user, self.data.n_item))
 
@@ -137,15 +137,16 @@ class Runner:
         model = callback()
 
         # pre-train
-        # 30% for batch training | 20% for batch evaluate
+        # 20% for batch training | 10% for batch evaluate
+        # after the batch training, 10% samples are used for incremental updating
         model.fit(
             self.data.samples[:self.data.n_batch_train],
             self.data.samples[self.data.n_batch_train:batch_tail],
             n_epoch=self.n_epoch
         )
 
-        # 70% incremental evaluation and updating (20% batch evaluation samples + 50% remainders)
-        res = model.evaluate(self.data.samples[self.data.n_batch_train:], window_size=self.window_size)
+        # 70% incremental evaluation and updating
+        res = model.evaluate(self.data.samples[batch_tail:], window_size=self.window_size)
 
         return model, res
 

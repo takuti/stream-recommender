@@ -54,29 +54,24 @@ class Base:
             self.__check(d)
             self.users[d['u_index']]['observed'].add(d['i_index'])
 
-        # for batch evaluation, temporarily save new users/items info
-        temporary_users = []
+        # for batch evaluation, temporarily save new users info
         for d in test_samples:
-            u_index = d['u_index']
-
-            if u_index not in self.users:
-                temporary_users.append(u_index)
-
             self.__check(d)
 
         self.batch_update(train_samples, test_samples, at, n_epoch)
 
-        # delete temporary items and users
-        self.n_user -= len(temporary_users)
-        for u_index in temporary_users:
-            del self.users[u_index]
+        # batch test samples are considered as a new observations;
+        # the model is incrementally updated based on them before the incremental evaluation step
+        for d in test_samples:
+            self.users[d['u_index']]['observed'].add(d['i_index'])
+            self.__update(d)
 
     def batch_update(self, train_samples, test_samples, at, n_epoch):
         """Batch update called by the fitting method.
 
         Args:
-            train_samples (list of dict): Positive training samples (0-30%).
-            test_sample (list of dict): Test samples (30-50%).
+            train_samples (list of dict): Positive training samples (0-20%).
+            test_sample (list of dict): Test samples (20-30%).
             at (int): Evaluation metric of this batch pre-training will be recall@{at}.
             n_epoch (int): Number of epochs for the batch training.
 
@@ -85,11 +80,11 @@ class Base:
             # SGD requires us to shuffle samples in each iteration
             np.random.shuffle(train_samples)
 
-            # 30%: update models
+            # 20%: update models
             for d in train_samples:
                 self.__update(d, is_batch_train=True)
 
-            # 20%: evaluate the current model
+            # 10%: evaluate the current model
             recall = self.batch_evaluate(test_samples, at)
             logger.debug('epoch %2d: recall@%d = %f' % (epoch + 1, at, recall))
 

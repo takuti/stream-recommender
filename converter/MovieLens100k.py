@@ -69,8 +69,8 @@ class MovieLens100kConverter:
         self.n_user = len(user_ids)
         self.n_item = len(item_ids)
         self.n_sample = len(self.samples)
-        self.n_batch_train = int(self.n_sample * 0.3)  # 30% for pre-training to avoid cold-start
-        self.n_batch_test = int(self.n_sample * 0.2)  # 20% for evaluation of pre-training
+        self.n_batch_train = int(self.n_sample * 0.2)  # 20% for pre-training to avoid cold-start
+        self.n_batch_test = int(self.n_sample * 0.1)  # 10% for evaluation of pre-training
         self.n_test = self.n_sample - (self.n_batch_train + self.n_batch_test)
 
     def __load_movies(self):
