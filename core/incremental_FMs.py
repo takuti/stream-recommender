@@ -79,13 +79,15 @@ class IncrementalFMs(Base):
         err = d['y'] - pred
 
         # update regularization parameters
-        self.l2_reg_w0 = max(0., self.l2_reg_w0 + 4. * self.learn_rate * (err * self.learn_rate * self.prev_w0))
-        self.l2_reg_w = max(0., self.l2_reg_w + 4. * self.learn_rate * (err * self.learn_rate * np.inner(x, self.prev_w)))
+        coeff = 4. * self.learn_rate * err * self.learn_rate
+
+        self.l2_reg_w0 = max(0., self.l2_reg_w0 + coeff * self.prev_w0)
+        self.l2_reg_w = max(0., self.l2_reg_w + coeff * np.inner(x, self.prev_w))
 
         dot_v = np.dot(x_vec.T, self.V).reshape((self.k,))  # (k, )
         dot_prev_v = np.dot(x_vec.T, self.prev_V).reshape((self.k,))  # (k, )
         s_duplicated = np.dot((x_vec.T ** 2), self.V * self.prev_V).reshape((self.k,))  # (k, )
-        self.l2_rev_V = np.maximum(np.zeros(self.k), self.l2_reg_V + 4. * self.learn_rate * (err * self.learn_rate * (dot_v * dot_prev_v - s_duplicated)))
+        self.l2_rev_V = np.maximum(np.zeros(self.k), self.l2_reg_V + coeff * (dot_v * dot_prev_v - s_duplicated))
 
         # update w0 with keeping the previous value
         self.prev_w0 = self.w0
@@ -138,7 +140,7 @@ class IncrementalFMs(Base):
         interaction /= 2.  # (n_item,)
 
         pred = self.w0 + safe_sparse_dot(self.w, mat, dense_output=True) + interaction
-        scores = np.abs(1. - (pred[:self.n_item] + np.sum(pred[self.n_item:])))
+        scores = np.abs(1. - pred)
 
         return self._Base__scores2recos(scores, target_i_indices, at)
 
@@ -158,7 +160,7 @@ class IncrementalFMs(Base):
         for d in samples:
             i_index = d['i_index']
 
-            if i_index <= max_i_index:
+            if i_index < max_i_index:
                 continue
 
             max_i_index += 1
