@@ -54,9 +54,9 @@ class IncrementalFMs(Base):
             self.w = np.concatenate((self.w[:self.n_user], rand, self.w[self.n_user:]))
             self.prev_w = np.concatenate((self.prev_w[:self.n_user], rand, self.prev_w[self.n_user:]))
 
-            rand_vec = np.random.normal(0., 0.1, self.k)
-            self.V = np.vstack((self.V[:self.n_user, :], rand_vec, self.V[self.n_user:, :]))
-            self.prev_V = np.vstack((self.prev_V[:self.n_user, :], rand_vec, self.prev_V[self.n_user:, :]))
+            rand_vec = np.random.normal(0., 0.1, (1, self.k))
+            self.V = np.concatenate((self.V[:self.n_user, :], rand_vec, self.V[self.n_user:, :]))
+            self.prev_V = np.concatenate((self.prev_V[:self.n_user, :], rand_vec, self.prev_V[self.n_user:, :]))
 
             self.users[u_index] = {'observed': set()}
             self.n_user += 1
@@ -116,17 +116,15 @@ class IncrementalFMs(Base):
         # i_mat is (n_item_context, n_item) for all possible items
 
         # u_mat will be (n_user + n_user_context, n_item) for the target user
-        u_ctx_mat = np.repeat(np.array([d['user']]).T, self.n_item, axis=1)  # (n_user_context, n_item)
-
-        u_mat = np.zeros((self.n_user, self.n_item))
-        u_mat[d['u_index'], :] = 1
-        u_mat = np.vstack((u_mat, u_ctx_mat))
+        u_vec = np.asarray([np.concatenate((np.zeros(self.n_user), d['user']))]).T
+        u_vec[d['u_index'], 0] = 1
+        u_mat = np.repeat(u_vec, self.n_item, axis=1)
 
         # dt_mat will be (1, n_item) for the target user
-        dt_mat = np.repeat(d['dt'], self.n_item)
+        dt_mat = np.repeat(d['dt'], self.n_item).reshape((1, self.n_item))
 
         # stack them into (p, n_item) matrix
-        mat = sp.csr_matrix(np.vstack((u_mat, self.i_mat, dt_mat))[:, target_i_indices])
+        mat = sp.csr_matrix(np.concatenate((u_mat, self.i_mat, dt_mat))[:, target_i_indices])
 
         # Matrix A and B should be dense (numpy array; rather than scipy CSR matrix) because V is dense.
         A = safe_sparse_dot(self.V.T, mat)
