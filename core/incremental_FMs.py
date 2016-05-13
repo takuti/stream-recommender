@@ -16,7 +16,7 @@ class IncrementalFMs(Base):
         self.n_item = n_item
 
         self.contexts = contexts
-        self.p = np.sum(contexts.values())
+        self.p = n_item + np.sum(contexts.values())
 
         # create item matrices which has contexts of each item in rows
         self.i_mat = self.__create_i_mat(samples)
@@ -39,22 +39,37 @@ class IncrementalFMs(Base):
         self.V = np.random.normal(0., 0.1, (self.p, self.k))
 
         # to keep the last parameters for adaptive regularization
-        self.prev_w0 = float('inf')
-        self.prev_w = np.array([])
-        self.prev_V = np.array([])
+        self.prev_w0 = np.random.normal(0., 0.1, 1)
+        self.prev_w = np.random.normal(0., 0.1, self.p)
+        self.prev_V = np.random.normal(0., 0.1, (self.p, self.k))
 
     def _Base__check(self, d):
         u_index = d['u_index']
 
         if u_index not in self.users:
+            # insert a new dimension into the model parameters
+            self.p += 1
+
+            rand = np.random.normal(0., 0.1, 1)
+            self.w = np.concatenate((self.w[:self.n_user], rand, self.w[self.n_user:]))
+            self.prev_w = np.concatenate((self.prev_w[:self.n_user], rand, self.prev_w[self.n_user:]))
+
+            rand_vec = np.random.normal(0., 0.1, self.k)
+            self.V = np.vstack((self.V[:self.n_user, :], rand_vec, self.V[self.n_user:, :]))
+            self.prev_V = np.vstack((self.prev_V[:self.n_user, :], rand_vec, self.prev_V[self.n_user:, :]))
+
             self.users[u_index] = {'observed': set()}
             self.n_user += 1
 
     def _Base__update(self, d, is_batch_train=False):
         # create a sample vector and make prediction
-        x = d['user']
-        x = np.append(x, d['item'])
-        x = np.append(x, d['dt'])
+        x_u = np.zeros(self.n_user)
+        x_u[d['u_index']] = 1
+
+        x_i = np.zeros(self.n_item)
+        x_i[d['i_index']] = 1
+
+        x = np.concatenate((x_u, d['user'], x_i, d['item'], d['dt']))
 
         x_vec = np.array([x]).T  # p x 1
         interaction = np.sum(np.dot(self.V.T, x_vec) ** 2 - np.dot(self.V.T ** 2, x_vec ** 2)) / 2.
@@ -64,14 +79,13 @@ class IncrementalFMs(Base):
         err = d['y'] - pred
 
         # update regularization parameters
-        if self.prev_w0 != float('inf') and self.prev_w.size != 0 and self.prev_V.size != 0:
-            self.l2_reg_w0 = max(0., self.l2_reg_w0 + 4. * self.learn_rate * (err * self.learn_rate * self.prev_w0))
-            self.l2_reg_w = max(0., self.l2_reg_w + 4. * self.learn_rate * (err * self.learn_rate * np.inner(x, self.prev_w)))
+        self.l2_reg_w0 = max(0., self.l2_reg_w0 + 4. * self.learn_rate * (err * self.learn_rate * self.prev_w0))
+        self.l2_reg_w = max(0., self.l2_reg_w + 4. * self.learn_rate * (err * self.learn_rate * np.inner(x, self.prev_w)))
 
-            dot_v = np.dot(x_vec.T, self.V).reshape((self.k,))  # (k, )
-            dot_prev_v = np.dot(x_vec.T, self.prev_V).reshape((self.k,))  # (k, )
-            s_duplicated = np.dot((x_vec.T ** 2), self.V * self.prev_V).reshape((self.k,))  # (k, )
-            self.l2_rev_V = np.maximum(np.zeros(self.k), self.l2_reg_V + 4. * self.learn_rate * (err * self.learn_rate * (dot_v * dot_prev_v - s_duplicated)))
+        dot_v = np.dot(x_vec.T, self.V).reshape((self.k,))  # (k, )
+        dot_prev_v = np.dot(x_vec.T, self.prev_V).reshape((self.k,))  # (k, )
+        s_duplicated = np.dot((x_vec.T ** 2), self.V * self.prev_V).reshape((self.k,))  # (k, )
+        self.l2_rev_V = np.maximum(np.zeros(self.k), self.l2_reg_V + 4. * self.learn_rate * (err * self.learn_rate * (dot_v * dot_prev_v - s_duplicated)))
 
         # update w0 with keeping the previous value
         self.prev_w0 = self.w0
@@ -99,8 +113,12 @@ class IncrementalFMs(Base):
     def _Base__recommend(self, d, target_i_indices, at=10):
         # i_mat is (n_item_context, n_item) for all possible items
 
-        # u_mat will be (n_user_context, n_item) for the target user
-        u_mat = np.repeat(np.array([d['user']]).T, self.n_item, axis=1)
+        # u_mat will be (n_user + n_user_context, n_item) for the target user
+        u_ctx_mat = np.repeat(np.array([d['user']]).T, self.n_item, axis=1)  # (n_user_context, n_item)
+
+        u_mat = np.zeros((self.n_user, self.n_item))
+        u_mat[d['u_index'], :] = 1
+        u_mat = np.vstack((u_mat, u_ctx_mat))
 
         # dt_mat will be (1, n_item) for the target user
         dt_mat = np.repeat(d['dt'], self.n_item)
@@ -131,19 +149,21 @@ class IncrementalFMs(Base):
             samples (list of dict): Each sample has an item vector.
 
         Returns:
-            numpy array (n_item_context, n_item): Column is an item vector.
+            numpy array (n_item + n_item_context, n_item): Column is an item vector.
 
         """
         i_mat = np.zeros((self.n_item, self.contexts['item']))
-        observed = np.zeros(self.n_item)
+        max_i_index = 0
 
         for d in samples:
             i_index = d['i_index']
 
-            if observed[i_index] == 1:
+            if i_index <= max_i_index:
                 continue
 
+            max_i_index += 1
             i_mat[i_index, :] = d['item']
-            observed[i_index] = 1
+
+        i_mat = np.hstack((np.identity(self.n_item), i_mat))
 
         return i_mat.T
