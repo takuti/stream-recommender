@@ -16,7 +16,7 @@ class IncrementalFMs(Base):
         self.n_item = n_item
 
         self.contexts = contexts
-        self.p = n_item + np.sum(contexts.values())
+        self.p = contexts['user'] + n_item + contexts['item']
 
         # create item matrices which has contexts of each item in rows
         self.i_mat = self.__create_i_mat(samples)
@@ -69,7 +69,7 @@ class IncrementalFMs(Base):
         x_i = np.zeros(self.n_item)
         x_i[d['i_index']] = 1
 
-        x = np.concatenate((x_u, d['user'], x_i, d['item'], d['dt']))
+        x = np.concatenate((x_u, d['user'], x_i, d['item']))
 
         x_vec = np.array([x]).T  # p x 1
         interaction = np.sum(np.dot(self.V.T, x_vec) ** 2 - np.dot(self.V.T ** 2, x_vec ** 2)) / 2.
@@ -124,11 +124,8 @@ class IncrementalFMs(Base):
         u_vec[d['u_index'], 0] = 1
         u_mat = np.repeat(u_vec, n_target, axis=1)
 
-        # dt_mat will be (1, n_item) for the target user
-        dt_mat = np.repeat(d['dt'], n_target).reshape((1, n_target))
-
         # stack them into (p, n_item) matrix
-        mat = sp.csr_matrix(np.concatenate((u_mat, i_mat, dt_mat)))
+        mat = sp.csr_matrix(np.concatenate((u_mat, i_mat)))
 
         # Matrix A and B should be dense (numpy array; rather than scipy CSR matrix) because V is dense.
         A = safe_sparse_dot(self.V.T, mat)
