@@ -34,14 +34,14 @@ class IncrementalFMs(Base):
         self.users = {}
 
         # initial parameters from Gaussian
-        self.w0 = np.random.normal(0., 0.1, 1)
+        self.w0 = np.random.normal(0., 0.1)
         self.w = np.random.normal(0., 0.1, self.p)
         self.V = np.random.normal(0., 0.1, (self.p, self.k))
 
         # to keep the last parameters for adaptive regularization
-        self.prev_w0 = np.random.normal(0., 0.1, 1)
-        self.prev_w = np.random.normal(0., 0.1, self.p)
-        self.prev_V = np.random.normal(0., 0.1, (self.p, self.k))
+        self.prev_w0 = self.w0
+        self.prev_w = self.w.copy()
+        self.prev_V = self.V.copy()
 
     def _Base__check(self, d):
         u_index = d['u_index']
