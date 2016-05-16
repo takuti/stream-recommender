@@ -54,6 +54,6 @@ class IncrementalMF(Base):
 
     def _Base__recommend(self, d, target_i_indices, at=10):
         pred = np.dot(self.users[d['u_index']]['vec'], self.Q[target_i_indices, :].T)
-        scores = np.abs(1. - pred.reshape(len(target_i_indices)))
+        scores = np.abs(1. - pred.flatten())
 
         return self._Base__scores2recos(scores, target_i_indices, at)

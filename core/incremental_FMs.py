@@ -114,17 +114,21 @@ class IncrementalFMs(Base):
 
     def _Base__recommend(self, d, target_i_indices, at=10):
         # i_mat is (n_item_context, n_item) for all possible items
+        # extract only target items
+        i_mat = self.i_mat[:, target_i_indices]
+
+        n_target = len(target_i_indices)
 
         # u_mat will be (n_user + n_user_context, n_item) for the target user
         u_vec = np.asarray([np.concatenate((np.zeros(self.n_user), d['user']))]).T
         u_vec[d['u_index'], 0] = 1
-        u_mat = np.repeat(u_vec, self.n_item, axis=1)
+        u_mat = np.repeat(u_vec, n_target, axis=1)
 
         # dt_mat will be (1, n_item) for the target user
-        dt_mat = np.repeat(d['dt'], self.n_item).reshape((1, self.n_item))
+        dt_mat = np.repeat(d['dt'], n_target).reshape((1, n_target))
 
         # stack them into (p, n_item) matrix
-        mat = sp.csr_matrix(np.concatenate((u_mat, self.i_mat, dt_mat))[:, target_i_indices])
+        mat = sp.csr_matrix(np.concatenate((u_mat, i_mat, dt_mat)))
 
         # Matrix A and B should be dense (numpy array; rather than scipy CSR matrix) because V is dense.
         A = safe_sparse_dot(self.V.T, mat)
