@@ -120,26 +120,31 @@ class IncrementalFMs(Base):
         n_target = len(target_i_indices)
 
         # u_mat will be (n_user + n_user_context, n_item) for the target user
-        u_vec = np.asarray([np.concatenate((np.zeros(self.n_user), d['user']))]).T
+        u_vec = np.zeros((self.n_user + self.contexts['user'], 1))
+        u_vec[-self.contexts['user']:, 0] = d['user']
         u_vec[d['u_index'], 0] = 1
-        u_mat = np.repeat(u_vec, n_target, axis=1)
+        u_mat = sp.csr_matrix(np.repeat(u_vec, n_target, axis=1))
 
         # stack them into (p, n_item) matrix
-        mat = sp.csr_matrix(np.concatenate((u_mat, i_mat)))
+        mat = sp.vstack((u_mat, i_mat))
 
         # Matrix A and B should be dense (numpy array; rather than scipy CSR matrix) because V is dense.
-        A = safe_sparse_dot(self.V.T, mat)
-        A = A ** 2
+        V = sp.csr_matrix(self.V)
+        A = safe_sparse_dot(V.T, mat)
+        A.data[:] = A.data ** 2
 
         sq_mat = mat.copy()
         sq_mat.data[:] = sq_mat.data ** 2
-        B = safe_sparse_dot(self.V.T ** 2, sq_mat)
+        sq_V = V.copy()
+        sq_V.data[:] = sq_V.data ** 2
+        B = safe_sparse_dot(sq_V.T, sq_mat)
 
-        interaction = np.sum(A - B, 0)
-        interaction /= 2.  # (n_item,)
+        interaction = (A - B).sum(axis=0)
+        interaction /= 2.  # (1, n_item); numpy matrix form
 
         pred = self.w0 + safe_sparse_dot(self.w, mat, dense_output=True) + interaction
-        scores = np.abs(1. - pred)
+
+        scores = np.abs(1. - np.ravel(pred))
 
         return self._Base__scores2recos(scores, target_i_indices, at)
 
@@ -167,4 +172,4 @@ class IncrementalFMs(Base):
 
         i_mat = np.hstack((np.identity(self.n_item), i_mat))
 
-        return i_mat.T
+        return sp.csr_matrix(i_mat.T)
