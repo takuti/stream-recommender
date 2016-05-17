@@ -22,7 +22,7 @@ class OnlineSketch(Base):
         self.n_item = n_item
 
         self.contexts = contexts
-        self.p = np.sum(contexts.values())
+        self.p = contexts['user'] + contexts['item']
         self.ell = int(np.sqrt(self.p))
 
         # create item matrices which has contexts of each item in rows
@@ -51,7 +51,6 @@ class OnlineSketch(Base):
 
             y = d['user']
             y = np.append(y, d['item'])
-            y = np.append(y, d['dt'])
 
             Y0[:, i] = y
 
@@ -96,7 +95,6 @@ class OnlineSketch(Base):
     def _Base__update(self, d, is_batch_train=False):
         y = d['user']
         y = np.append(y, d['item'])
-        y = np.append(y, d['dt'])
 
         # combine current sketched matrix with input at time t
         self.B[:, (self.ell - 1)] = y
@@ -116,15 +114,16 @@ class OnlineSketch(Base):
 
     def _Base__recommend(self, d, target_i_indices, at=10):
         # i_mat is (n_item_context, n_item) for all possible items
+        # extract only target items
+        i_mat = self.i_mat[:, target_i_indices]
+
+        n_target = len(target_i_indices)
 
         # u_mat will be (n_user_context, n_item) for the target user
-        u_mat = np.repeat(np.array([d['user']]).T, self.n_item, axis=1)
-
-        # dt_mat will be (1, n_item) for the target user
-        dt_mat = np.repeat(d['dt'], self.n_item)
+        u_mat = sp.csr_matrix(np.repeat(np.array([d['user']]).T, n_target, axis=1))
 
         # stack them into (p, n_item) matrix
-        Y = sp.csr_matrix(np.vstack((u_mat, self.i_mat, dt_mat))[:, target_i_indices])
+        Y = sp.vstack((u_mat, i_mat))
 
         X = np.identity(self.p) - np.dot(self.U, self.U.T)
         A = safe_sparse_dot(X, Y, dense_output=True)
@@ -144,15 +143,15 @@ class OnlineSketch(Base):
 
         """
         i_mat = np.zeros((self.n_item, self.contexts['item']))
-        observed = np.zeros(self.n_item)
+        max_i_index = 0
 
         for d in samples:
             i_index = d['i_index']
 
-            if observed[i_index] == 1:
+            if i_index < max_i_index:
                 continue
 
+            max_i_index += 1
             i_mat[i_index, :] = d['item']
-            observed[i_index] = 1
 
-        return i_mat.T
+        return sp.csr_matrix(i_mat.T)
