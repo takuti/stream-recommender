@@ -13,6 +13,7 @@ from core.incremental_MF import IncrementalMF
 from core.incremental_FMs import IncrementalFMs
 from core.online_sketch import OnlineSketch
 from core.random import Random
+from core.popular import Popular
 
 from converter.converter import Converter
 
@@ -123,6 +124,23 @@ class Runner:
 
         return res
 
+    def popular(self):
+        """Popularity (non-personalized) baseline
+
+        Returns:
+            list of float values: Simple Moving Averages (i.e. incremental recall).
+            float: average time to recommend/update for one sample
+
+        """
+        logger.debug('# popularity baseline')
+
+        def create():
+            return Popular(self.data.n_item)
+
+        model, res = self.__run(create)
+
+        return res
+
     def __run(self, callback):
         """Test runner.
 
@@ -160,7 +178,7 @@ def save(path, avgs, time):
 
 import click
 
-models = ['static-MF', 'iMF', 'iFMs', 'sketch', 'random']
+models = ['static-MF', 'iMF', 'iFMs', 'sketch', 'random', 'popular']
 datasets = ['ML1M', 'ML100k', 'LastFM']
 
 
@@ -178,6 +196,8 @@ def cli(model, dataset, window_size, n_epoch):
         avgs, time = exp.sketch()
     elif model == 'random':
         avgs, time = exp.random()
+    elif model == 'popular':
+        avgs, time = exp.popular()
     elif model == 'iFMs':
         avgs, time = exp.iFMs()
 
