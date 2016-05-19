@@ -10,6 +10,7 @@ from base import Base
 import numpy as np
 import numpy.linalg as ln
 import scipy.sparse as sp
+from sklearn import preprocessing
 from sklearn.utils.extmath import safe_sparse_dot
 
 
@@ -22,7 +23,10 @@ class OnlineSketch(Base):
         self.n_item = n_item
 
         self.contexts = contexts
+
+        # consider a lower triangle w/o self-interaction
         self.p = contexts['user'] + contexts['item']
+
         self.ell = int(np.sqrt(self.p))
 
         # create item matrices which has contexts of each item in rows
@@ -42,6 +46,10 @@ class OnlineSketch(Base):
             n_epoch (int): Number of epochs for the batch training. (fixed by 1)
 
         """
+        # for batch evaluation, temporarily save new users info
+        for d in test_samples:
+            self._Base__check(d)
+
         Y0 = np.zeros((self.p, len(train_samples)))
 
         # 20%: update models
@@ -53,6 +61,8 @@ class OnlineSketch(Base):
             y = np.append(y, d['item'])
 
             Y0[:, i] = y
+
+        Y0 = preprocessing.normalize(Y0, norm='l2', axis=0)
 
         # initial ell orthogonal bases are computed by truncated SVD
         U, s, V = ln.svd(Y0, full_matrices=False)
@@ -67,14 +77,13 @@ class OnlineSketch(Base):
         # define initial sketched matrix B
         self.B = np.dot(self.U, np.diag(s))
 
-        logger.debug('done: 20% initial sketching')
+        recall = self.batch_evaluate(test_samples, at)
+        logger.debug('done: 20%% initial sketching with recall@%d = %f' % (at, recall))
 
         # for further incremental evaluation,
         # the model is incrementally updated by using the 10% samples
         for d in test_samples:
-            self._Base__check(d)
             self.users[d['u_index']]['observed'].add(d['i_index'])
-
             self._Base__update(d)
 
         logger.debug('done: additional learning for the 10% batch test samples')
@@ -95,6 +104,7 @@ class OnlineSketch(Base):
     def _Base__update(self, d, is_batch_train=False):
         y = d['user']
         y = np.append(y, d['item'])
+        y = preprocessing.normalize(np.array([y]), norm='l2').flatten()
 
         # combine current sketched matrix with input at time t
         self.B[:, (self.ell - 1)] = y
@@ -124,6 +134,7 @@ class OnlineSketch(Base):
 
         # stack them into (p, n_item) matrix
         Y = sp.vstack((u_mat, i_mat))
+        Y = sp.csr_matrix(preprocessing.normalize(Y.toarray(), norm='l2', axis=0))
 
         X = np.identity(self.p) - np.dot(self.U, self.U.T)
         A = safe_sparse_dot(X, Y, dense_output=True)
