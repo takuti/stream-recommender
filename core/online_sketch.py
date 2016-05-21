@@ -19,18 +19,13 @@ class OnlineSketch(Base):
     """Inspired by: Streaming Anomaly Detection using Online Matrix Sketching
     """
 
-    def __init__(self, n_item, samples, contexts):
-        self.n_item = n_item
-
+    def __init__(self, contexts):
         self.contexts = contexts
 
         # consider a lower triangle w/o self-interaction
         self.p = contexts['user'] + contexts['item']
 
         self.ell = int(np.sqrt(self.p))
-
-        # create item matrices which has contexts of each item in rows
-        self.i_mat = self.__create_i_mat(samples)
 
         self._Base__clear()
 
@@ -92,14 +87,25 @@ class OnlineSketch(Base):
         self.n_user = 0
         self.users = {}
 
+        self.n_item = 0
+        self.items = {}
+
+        self.i_mat = sp.csr_matrix([])
+
         self.B = np.random.normal(0., 0.1, (self.p, self.ell))
 
     def _Base__check(self, d):
         u_index = d['u_index']
-
         if u_index not in self.users:
             self.users[u_index] = {'observed': set()}
             self.n_user += 1
+
+        i_index = d['i_index']
+        if i_index not in self.items:
+            self.items[i_index] = {}
+            self.n_item += 1
+            i = sp.csr_matrix(np.array([d['item']]).T)
+            self.i_mat = i if self.i_mat.size == 0 else sp.csr_matrix(sp.hstack((self.i_mat, i)))
 
     def _Base__update(self, d, is_batch_train=False):
         y = d['user']
@@ -142,27 +148,3 @@ class OnlineSketch(Base):
         scores = ln.norm(A, axis=0, ord=2)
 
         return self._Base__scores2recos(scores, target_i_indices, at)
-
-    def __create_i_mat(self, samples):
-        """Create an item matrix which has contexts of each item in rows.
-
-        Args:
-            samples (list of dict): Each sample has an item vector.
-
-        Returns:
-            numpy array (n_item_context, n_item): Column is an item vector.
-
-        """
-        i_mat = np.zeros((self.n_item, self.contexts['item']))
-        max_i_index = 0
-
-        for d in samples:
-            i_index = d['i_index']
-
-            if i_index < max_i_index:
-                continue
-
-            max_i_index += 1
-            i_mat[i_index, :] = d['item']
-
-        return sp.csr_matrix(i_mat.T)

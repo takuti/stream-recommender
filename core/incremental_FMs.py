@@ -11,15 +11,10 @@ class IncrementalFMs(Base):
     """
 
     def __init__(
-            self, n_item, samples, contexts, k=40, l2_reg_w0=.01, l2_reg_w=.01, l2_reg_V=30., learn_rate=.003):
-
-        self.n_item = n_item
+            self, contexts, k=6, l2_reg_w0=.01, l2_reg_w=.01, l2_reg_V=30., learn_rate=.003):
 
         self.contexts = contexts
-        self.p = contexts['user'] + n_item + contexts['item']
-
-        # create item matrices which has contexts of each item in rows
-        self.i_mat = self.__create_i_mat(samples)
+        self.p = contexts['user'] + contexts['item']
 
         self.k = k
         self.l2_reg_w0 = l2_reg_w0
@@ -33,6 +28,11 @@ class IncrementalFMs(Base):
         self.n_user = 0
         self.users = {}
 
+        self.n_item = 0
+        self.items = {}
+
+        self.i_mat = sp.csr_matrix([])
+
         # initial parameters from Gaussian
         self.w0 = np.random.normal(0., 0.1)
         self.w = np.random.normal(0., 0.1, self.p)
@@ -45,31 +45,19 @@ class IncrementalFMs(Base):
 
     def _Base__check(self, d):
         u_index = d['u_index']
-
         if u_index not in self.users:
-            # insert a new dimension into the model parameters
-            self.p += 1
-
-            rand = np.random.normal(0., 0.1, 1)
-            self.w = np.concatenate((self.w[:self.n_user], rand, self.w[self.n_user:]))
-            self.prev_w = np.concatenate((self.prev_w[:self.n_user], rand, self.prev_w[self.n_user:]))
-
-            rand_vec = np.random.normal(0., 0.1, (1, self.k))
-            self.V = np.concatenate((self.V[:self.n_user, :], rand_vec, self.V[self.n_user:, :]))
-            self.prev_V = np.concatenate((self.prev_V[:self.n_user, :], rand_vec, self.prev_V[self.n_user:, :]))
-
             self.users[u_index] = {'observed': set()}
             self.n_user += 1
 
+        i_index = d['i_index']
+        if i_index not in self.items:
+            self.items[i_index] = {}
+            self.n_item += 1
+            i = sp.csr_matrix(np.array([d['item']]).T)
+            self.i_mat = i if self.i_mat.size == 0 else sp.csr_matrix(sp.hstack((self.i_mat, i)))
+
     def _Base__update(self, d, is_batch_train=False):
-        # create a sample vector and make prediction
-        x_u = np.zeros(self.n_user)
-        x_u[d['u_index']] = 1
-
-        x_i = np.zeros(self.n_item)
-        x_i[d['i_index']] = 1
-
-        x = np.concatenate((x_u, d['user'], x_i, d['item']))
+        x = np.concatenate((d['user'], d['item']))
 
         x_vec = np.array([x]).T  # p x 1
         interaction = np.sum(np.dot(self.V.T, x_vec) ** 2 - np.dot(self.V.T ** 2, x_vec ** 2)) / 2.
@@ -120,9 +108,7 @@ class IncrementalFMs(Base):
         n_target = len(target_i_indices)
 
         # u_mat will be (n_user + n_user_context, n_item) for the target user
-        u_vec = np.zeros((self.n_user + self.contexts['user'], 1))
-        u_vec[-self.contexts['user']:, 0] = d['user']
-        u_vec[d['u_index'], 0] = 1
+        u_vec = np.array([d['user']]).T
         u_mat = sp.csr_matrix(np.repeat(u_vec, n_target, axis=1))
 
         # stack them into (p, n_item) matrix
@@ -147,29 +133,3 @@ class IncrementalFMs(Base):
         scores = np.abs(1. - np.ravel(pred))
 
         return self._Base__scores2recos(scores, target_i_indices, at)
-
-    def __create_i_mat(self, samples):
-        """Create an item matrix which has contexts of each item in rows.
-
-        Args:
-            samples (list of dict): Each sample has an item vector.
-
-        Returns:
-            numpy array (n_item + n_item_context, n_item): Column is an item vector.
-
-        """
-        i_mat = np.zeros((self.n_item, self.contexts['item']))
-        max_i_index = 0
-
-        for d in samples:
-            i_index = d['i_index']
-
-            if i_index < max_i_index:
-                continue
-
-            max_i_index += 1
-            i_mat[i_index, :] = d['item']
-
-        i_mat = np.hstack((np.identity(self.n_item), i_mat))
-
-        return sp.csr_matrix(i_mat.T)

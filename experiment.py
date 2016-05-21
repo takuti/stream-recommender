@@ -53,7 +53,7 @@ class Runner:
             logger.debug('# iMF')
 
         def create():
-            return IncrementalMF(self.data.n_item, is_static)
+            return IncrementalMF(is_static)
 
         model, res = self.__run(create)
         return res
@@ -73,8 +73,6 @@ class Runner:
 
         def create():
             return IncrementalFMs(
-                n_item=self.data.n_item,
-                samples=self.data.samples,
                 contexts=self.data.contexts)
 
         model, res = self.__run(create)
@@ -99,8 +97,6 @@ class Runner:
 
         def create():
             return OnlineSketch(
-                n_item=self.data.n_item,
-                samples=self.data.samples,
                 contexts=self.data.contexts)
 
         model, res = self.__run(create)
@@ -118,7 +114,7 @@ class Runner:
         logger.debug('# random baseline')
 
         def create():
-            return Random(self.data.n_item)
+            return Random()
 
         model, res = self.__run(create)
 
@@ -135,7 +131,7 @@ class Runner:
         logger.debug('# popularity baseline')
 
         def create():
-            return Popular(self.data.n_item)
+            return Popular()
 
         model, res = self.__run(create)
 
