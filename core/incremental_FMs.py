@@ -33,9 +33,9 @@ class IncrementalFMs(Base):
 
         self.i_mat = sp.csr_matrix([])
 
-        # initial parameters from Gaussian
-        self.w0 = np.random.normal(0., 0.1)
-        self.w = np.random.normal(0., 0.1, self.p)
+        # initial parameters
+        self.w0 = 0.
+        self.w = np.zeros(self.p)
         self.V = np.random.normal(0., 0.1, (self.p, self.k))
 
         # to keep the last parameters for adaptive regularization
