@@ -135,7 +135,6 @@ class Base:
         # start timer
         start = time.clock()
 
-        all_items = set(range(self.n_item))
         for i, d in enumerate(test_samples):
             self.__check(d)
 
@@ -144,7 +143,7 @@ class Base:
 
             # unobserved items
             # * item i interacted by user u must be in the recommendation candidate
-            unobserved = all_items - self.users[u_index]['observed']
+            unobserved = set(range(self.n_item)) - self.users[u_index]['observed']
             unobserved.add(i_index)
             target_i_indices = np.asarray(list(unobserved))
 
