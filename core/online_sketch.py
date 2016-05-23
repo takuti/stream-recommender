@@ -31,7 +31,7 @@ class OnlineSketch(Base):
 
     # Since a batch training procedure is totally different from the matrix factorization techniques,
     # a public method "fit" is overridden.
-    def fit(self, train_samples, test_samples, n_epoch=1, at=10):
+    def fit(self, train_samples, test_samples, n_epoch=1, at=40):
         """Learn the "positve" sketched matrix using the first 30% positive samples to avoid cold-start.
 
         Args:
@@ -73,7 +73,9 @@ class OnlineSketch(Base):
         self.B = np.dot(self.U, np.diag(s))
 
         recall = self.batch_evaluate(test_samples, at)
-        logger.debug('done: 20%% initial sketching with recall@%d = %f' % (at, recall))
+        logger.debug('done: 20%% initial sketching with recall@%d = %f' % (at, recall[-1]))
+
+        logger.debug('[' + ', '.join([str(r) for r in recall]) + ']')
 
         # for further incremental evaluation,
         # the model is incrementally updated by using the 10% samples

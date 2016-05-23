@@ -34,7 +34,7 @@ class Base:
         # initialize models and user/item information
         self.__clear()
 
-    def fit(self, train_samples, test_samples, at=10, n_epoch=1):
+    def fit(self, train_samples, test_samples, at=40, n_epoch=1):
         """Train a model using the first 30% positive samples to avoid cold-start.
 
         Evaluation of this batch training is done by using the next 20% positive samples.
@@ -86,7 +86,9 @@ class Base:
 
             # 10%: evaluate the current model
             recall = self.batch_evaluate(test_samples, at)
-            logger.debug('epoch %2d: recall@%d = %f' % (epoch + 1, at, recall))
+            logger.debug('epoch %2d: recall@%d = %f' % (epoch + 1, at, recall[-1]))
+
+        logger.debug('[' + ', '.join([str(r) for r in recall]) + ']')
 
     def batch_evaluate(self, test_samples, at):
         """Evaluate the current model by using the given test samples.
@@ -98,7 +100,7 @@ class Base:
                         top-{at} recommendation list has a true item -> TP++
 
         """
-        n_tp = 0
+        n_tp = np.zeros(at)
 
         all_items = set(range(self.n_item))
         for i, d in enumerate(test_samples):
@@ -109,10 +111,12 @@ class Base:
             recos = self.__recommend(d, target_i_indices, at)
 
             # is a true sample in the top-{at} recommendation list?
-            if d['i_index'] in recos:
-                n_tp += 1
+            for j, reco_i_index in enumerate(recos):
+                if reco_i_index == d['i_index']:
+                    n_tp[j:] += 1
+                    break
 
-        return float(n_tp) / len(test_samples)
+        return n_tp / float(len(test_samples))
 
     def evaluate(self, test_samples, window_size=5000, at=10):
         """Iterate recommend/update procedure and compute incremental recall.
