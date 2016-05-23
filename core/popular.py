@@ -32,10 +32,8 @@ class Popular(Base):
             self.n_item += 1
             self.freq = np.append(self.freq, 0)
 
-        self.freq[i_index] += 1
-
     def _Base__update(self, d, is_batch_train=False):
-        return
+        self.freq[d['i_index']] += 1
 
     def _Base__recommend(self, d, target_i_indices, at=10):
         sorted_indices = np.argsort(self.freq[target_i_indices])[::-1]
