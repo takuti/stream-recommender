@@ -46,18 +46,53 @@ class IncrementalFMs(Base):
     def _Base__check(self, d):
         u_index = d['u_index']
         if u_index not in self.users:
+            # insert new user's row for the parameters
+            self.w = np.concatenate((self.w[:self.n_user], np.array([0.]), self.w[self.n_user:]))
+            self.prev_w = np.concatenate((self.prev_w[:self.n_user], np.array([0.]), self.prev_w[self.n_user:]))
+
+            rand_row = np.random.normal(0., 0.1, (1, self.k))
+            self.V = np.concatenate((self.V[:self.n_user], rand_row, self.V[self.n_user:]))
+            self.prev_V = np.concatenate((self.prev_V[:self.n_user], rand_row, self.prev_V[self.n_user:]))
+
             self.users[u_index] = {'observed': set()}
+
             self.n_user += 1
+            self.p += 1
 
         i_index = d['i_index']
         if i_index not in self.items:
+            # insert new item's row for the parameters
+            h = self.n_user + self.n_item
+            self.w = np.concatenate((self.w[:h], np.array([0.]), self.w[h:]))
+            self.prev_w = np.concatenate((self.prev_w[:h], np.array([0.]), self.prev_w[h:]))
+
+            rand_row = np.random.normal(0., 0.1, (1, self.k))
+            self.V = np.concatenate((self.V[:h], rand_row, self.V[h:]))
+            self.prev_V = np.concatenate((self.prev_V[:h], rand_row, self.prev_V[h:]))
+
+            # update the item matrix for all items
+            i = np.concatenate((np.zeros(self.n_item + 1), d['item']))
+            i[i_index] = 1.
+            sp_i_vec = sp.csr_matrix(np.array([i]).T)
+
+            if self.i_mat.size == 0:
+                self.i_mat = sp_i_vec
+            else:
+                self.i_mat = sp.vstack((self.i_mat[:self.n_item], np.zeros((1, self.n_item)), self.i_mat[self.n_item:]))
+                self.i_mat = sp.csr_matrix(sp.hstack((self.i_mat, sp_i_vec)))
+
             self.items[i_index] = {}
+
             self.n_item += 1
-            i = sp.csr_matrix(np.array([d['item']]).T)
-            self.i_mat = i if self.i_mat.size == 0 else sp.csr_matrix(sp.hstack((self.i_mat, i)))
+            self.p += 1
 
     def _Base__update(self, d, is_batch_train=False):
-        x = np.concatenate((d['user'], d['item']))
+        # create user/item ID vector
+        x = np.zeros(self.n_user + self.n_item)
+        x[d['u_index']] = x[self.n_user + d['i_index']] = 1.
+
+        # append contextual variables
+        x = np.concatenate((x, d['user'], d['item']))
 
         x_vec = np.array([x]).T  # p x 1
         interaction = np.sum(np.dot(self.V.T, x_vec) ** 2 - np.dot(self.V.T ** 2, x_vec ** 2)) / 2.
@@ -108,11 +143,14 @@ class IncrementalFMs(Base):
         n_target = len(target_i_indices)
 
         # u_mat will be (n_user + n_user_context, n_item) for the target user
-        u_vec = np.array([d['user']]).T
+        u = np.concatenate((np.zeros(self.n_user), d['user']))
+        u[d['u_index']] = 1.
+        u_vec = np.array([u]).T
         u_mat = sp.csr_matrix(np.repeat(u_vec, n_target, axis=1))
 
         # stack them into (p, n_item) matrix
-        mat = sp.vstack((u_mat, i_mat))
+        # rows are ordered by [user ID - item ID - user context - item context]
+        mat = sp.vstack((u_mat[:self.n_user], i_mat[:self.n_item], u_mat[self.n_user:], i_mat[self.n_item:]))
 
         # Matrix A and B should be dense (numpy array; rather than scipy CSR matrix) because V is dense.
         V = sp.csr_matrix(self.V)
