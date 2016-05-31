@@ -34,7 +34,7 @@ class Base:
         # initialize models and user/item information
         self.__clear()
 
-    def fit(self, train_samples, test_samples, at=40, n_epoch=1):
+    def fit(self, train_samples, test_samples, at=10, n_epoch=1):
         """Train a model using the first 30% positive samples to avoid cold-start.
 
         Evaluation of this batch training is done by using the next 20% positive samples.
