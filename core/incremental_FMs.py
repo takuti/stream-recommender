@@ -11,7 +11,7 @@ class IncrementalFMs(Base):
     """
 
     def __init__(
-            self, contexts, k=6, l2_reg_w0=.01, l2_reg_w=.01, l2_reg_V=30., learn_rate=.003):
+            self, contexts, k=40, l2_reg_w0=2., l2_reg_w=8., l2_reg_V=16., learn_rate=.01):
 
         self.contexts = contexts
         self.p = contexts['user'] + contexts['item']
