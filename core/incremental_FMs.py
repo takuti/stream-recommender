@@ -1,5 +1,12 @@
 from base import Base
 
+from logging import getLogger, StreamHandler, DEBUG
+logger = getLogger(__name__)
+handler = StreamHandler()
+handler.setLevel(DEBUG)
+logger.setLevel(DEBUG)
+logger.addHandler(handler)
+
 import numpy as np
 import scipy.sparse as sp
 from sklearn.utils.extmath import safe_sparse_dot
@@ -106,6 +113,9 @@ class IncrementalFMs(Base):
 
         self.l2_reg_w0 = max(0., self.l2_reg_w0 + coeff * self.prev_w0)
         self.l2_reg_w = max(0., self.l2_reg_w + coeff * np.inner(x, self.prev_w))
+
+        if self.l2_reg_w0 == 0. or self.l2_reg_w == 0.:
+            logger.debug('[warn] reg_w0 and/or reg_w are fallen in 0.0')
 
         dot_v = np.dot(x_vec.T, self.V).reshape((self.k,))  # (k, )
         dot_prev_v = np.dot(x_vec.T, self.prev_V).reshape((self.k,))  # (k, )
