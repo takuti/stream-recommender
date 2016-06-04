@@ -26,7 +26,7 @@ class MovieLens1MConverter:
         self.__load_ratings()
 
         users = self.__load_users()
-        movies = self.__load_movies()
+        movies, movie_titles = self.__load_movies()
 
         user_ids = []
         item_ids = []
@@ -61,7 +61,8 @@ class MovieLens1MConverter:
                 'i_index': i_index,
                 'dt': np.array([dt]),
                 'item': movies[item_id],
-                'user': users[user_id]
+                'user': users[user_id],
+                'title': movie_titles[item_id]
             }
 
             self.samples.append(sample)
@@ -104,14 +105,17 @@ class MovieLens1MConverter:
         n_genre = len(all_genres)
 
         movies = {}
+        movie_titles = {}
         for item_id_str, title, genres in lines:
             movie_vec = np.zeros(n_genre)
             for genre in genres.split('|'):
                 i = all_genres.index(genre)
                 movie_vec[i] = 1.
-            movies[int(item_id_str)] = movie_vec
+            item_id = int(item_id_str)
+            movies[item_id] = movie_vec
+            movie_titles[item_id] = title
 
-        return movies
+        return movies, movie_titles
 
     def __load_users(self):
         """Load user demographics as contexts.User ID -> {sex (M/F), age (7 groupd), occupation(0-20; 21)}
