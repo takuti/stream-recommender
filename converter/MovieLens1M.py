@@ -82,7 +82,7 @@ class MovieLens1MConverter:
 
         """
         with open(self.path['items']) as f:
-            lines = map(lambda l: l.rstrip().split('::'), f.readlines())
+            lines = list(map(lambda l: l.rstrip().split('::'), f.readlines()))
 
         all_genres = ['Action',
                       'Adventure',
@@ -125,7 +125,7 @@ class MovieLens1MConverter:
 
         """
         with open(self.path['users']) as f:
-            lines = map(lambda l: l.rstrip().split('::'), f.readlines())
+            lines = list(map(lambda l: l.rstrip().split('::'), f.readlines()))
 
         ages = [1, 18, 25, 35, 45, 50, 56]
 
@@ -145,7 +145,7 @@ class MovieLens1MConverter:
         """
         ratings = []
         with open(self.path['ratings']) as f:
-            lines = map(lambda l: map(int, l.rstrip().split('::')), f.readlines())
+            lines = list(map(lambda l: list(map(int, l.rstrip().split('::'))), f.readlines()))
             for l in lines:
                 # Since we consider positive-only feedback setting, ratings < 5 will be excluded.
                 if l[2] == 5:
