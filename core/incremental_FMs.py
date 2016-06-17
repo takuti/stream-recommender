@@ -136,7 +136,7 @@ class IncrementalFMs(Base):
 
         # update w and V
         prod = np.dot(np.array([x]), self.prev_V)  # (1, p) and (p, k) => (1, k)
-        for pi in xrange(self.p):
+        for pi in range(self.p):
             if x[pi] == 0.:
                 continue
 
