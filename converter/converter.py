@@ -1,8 +1,8 @@
 # coding: utf-8
 
-from MovieLens1M import MovieLens1MConverter
-from MovieLens100k import MovieLens100kConverter
-from LastFM import LastFMConverter
+from .MovieLens1M import MovieLens1MConverter
+from .MovieLens100k import MovieLens100kConverter
+from .LastFM import LastFMConverter
 
 
 class Converter:

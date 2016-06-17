@@ -5,7 +5,7 @@ handler.setLevel(DEBUG)
 logger.setLevel(DEBUG)
 logger.addHandler(handler)
 
-from base import Base
+from .base import Base
 
 import numpy as np
 import numpy.linalg as ln
