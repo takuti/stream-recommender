@@ -81,7 +81,7 @@ class MovieLens1MConverter:
             dict of movie vectors: item_id -> numpy array (n_genre,)
 
         """
-        with open(self.path['items']) as f:
+        with open(self.path['items'], encoding='ISO-8859-1') as f:
             lines = list(map(lambda l: l.rstrip().split('::'), f.readlines()))
 
         all_genres = ['Action',
@@ -124,7 +124,7 @@ class MovieLens1MConverter:
             dict of user vectors: user_id -> numpy array (1+1+21,); (sex_flg + age_group + n_occupation, )
 
         """
-        with open(self.path['users']) as f:
+        with open(self.path['users'], encoding='ISO-8859-1') as f:
             lines = list(map(lambda l: l.rstrip().split('::'), f.readlines()))
 
         ages = [1, 18, 25, 35, 45, 50, 56]
@@ -144,7 +144,7 @@ class MovieLens1MConverter:
 
         """
         ratings = []
-        with open(self.path['ratings']) as f:
+        with open(self.path['ratings'], encoding='ISO-8859-1') as f:
             lines = list(map(lambda l: list(map(int, l.rstrip().split('::'))), f.readlines()))
             for l in lines:
                 # Since we consider positive-only feedback setting, ratings < 5 will be excluded.
