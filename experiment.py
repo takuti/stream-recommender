@@ -58,7 +58,7 @@ class Runner:
         model, res = self.__run(create)
         return res
 
-    def iFMs(self, is_context_aware=False):
+    def iFMs(self, is_context_aware=False, is_static=False):
         """Incremental Factorization Machines
 
         Args:
@@ -69,11 +69,13 @@ class Runner:
             float: average time to recommend/update for one sample
 
         """
-        logger.debug('# iFMs')
+        if is_static:
+            logger.debug('# static FMs')
+        else:
+            logger.debug('# iFMs')
 
         def create():
-            return IncrementalFMs(
-                contexts=self.data.contexts)
+            return IncrementalFMs(contexts=self.data.contexts, is_static=is_static)
 
         model, res = self.__run(create)
 
@@ -174,7 +176,7 @@ def save(path, avgs, time):
 
 import click
 
-models = ['static-MF', 'iMF', 'iFMs', 'sketch', 'random', 'popular']
+models = ['static-MF', 'iMF', 'static-FMs', 'iFMs', 'sketch', 'random', 'popular']
 datasets = ['ML1M', 'ML100k', 'LastFM']
 
 
@@ -194,8 +196,8 @@ def cli(model, dataset, window_size, n_epoch):
         avgs, time = exp.random()
     elif model == 'popular':
         avgs, time = exp.popular()
-    elif model == 'iFMs':
-        avgs, time = exp.iFMs()
+    elif model == 'static-FMs' or model == 'iFMs':
+        avgs, time = exp.iFMs(is_static=True) if model == 'static-FMs' else exp.iFMs()
 
     save('results/%s_%s_%s.txt' % (dataset, model, window_size), avgs, time)
 

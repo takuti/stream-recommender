@@ -18,10 +18,12 @@ class IncrementalFMs(Base):
     """
 
     def __init__(
-            self, contexts, k=40, l2_reg_w0=2., l2_reg_w=8., l2_reg_V=16., learn_rate=.01):
+            self, contexts, is_static=False, k=40, l2_reg_w0=2., l2_reg_w=8., l2_reg_V=16., learn_rate=.01):
 
         self.contexts = contexts
         self.p = contexts['user'] + contexts['item']
+
+        self.is_static = is_static
 
         self.k = k
         self.l2_reg_w0 = l2_reg_w0
@@ -94,6 +96,10 @@ class IncrementalFMs(Base):
             self.p += 1
 
     def _Base__update(self, d, is_batch_train=False):
+        # static baseline; w/o updating the model
+        if not is_batch_train and self.is_static:
+            return
+
         # create user/item ID vector
         x = np.zeros(self.n_user + self.n_item)
         x[d['u_index']] = x[self.n_user + d['i_index']] = 1.
