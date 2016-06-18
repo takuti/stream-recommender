@@ -170,9 +170,9 @@ class Runner:
         return model, res
 
 
-def save(path, avgs, time):
+def save(path, recalls, avg_recommend, avg_update):
     with open(path, 'w') as f:
-        f.write('\n'.join(map(str, np.append(time, avgs))))
+        f.write('\n'.join(map(str, np.append(np.array([avg_recommend, avg_update]), recalls))))
 
 import click
 
@@ -189,17 +189,18 @@ def cli(model, dataset, window_size, n_epoch):
     exp = Runner(dataset=dataset, window_size=window_size, n_epoch=n_epoch)
 
     if model == 'static-MF' or model == 'iMF':
-        avgs, time = exp.iMF(is_static=True) if model == 'static-MF' else exp.iMF()
+        res = exp.iMF(is_static=True) if model == 'static-MF' else exp.iMF()
     elif model == 'sketch':
-        avgs, time = exp.sketch()
+        res = exp.sketch()
     elif model == 'random':
-        avgs, time = exp.random()
+        res = exp.random()
     elif model == 'popular':
-        avgs, time = exp.popular()
+        res = exp.popular()
     elif model == 'static-FMs' or model == 'iFMs':
-        avgs, time = exp.iFMs(is_static=True) if model == 'static-FMs' else exp.iFMs()
+        res = exp.iFMs(is_static=True) if model == 'static-FMs' else exp.iFMs()
 
-    save('results/%s_%s_%s.txt' % (dataset, model, window_size), avgs, time)
+    recalls, avg_recommend, avg_update = res
+    save('results/%s_%s_%s.txt' % (dataset, model, window_size), recalls, avg_recommend, avg_update)
 
 if __name__ == '__main__':
     cli()

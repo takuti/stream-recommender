@@ -136,8 +136,9 @@ class Base:
         window = np.zeros(window_size)
         sum_window = 0.
 
-        # start timer
-        start = time.clock()
+        # timer
+        sum_recommend_time = 0.
+        sum_update_time = 0.
 
         for i, d in enumerate(test_samples):
             self.__check(d)
@@ -152,7 +153,9 @@ class Base:
             target_i_indices = np.asarray(list(unobserved))
 
             # make top-{at} recommendation for the 1001 items
+            start = time.clock()
             recos = self.__recommend(d, target_i_indices, at)
+            sum_recommend_time += (time.clock() - start)
 
             # increment a hit counter if i_index is in the top-{at} recommendation list
             # i.e. score the recommendation list based on the true observed item
@@ -167,12 +170,11 @@ class Base:
 
             # Step 2: update the model with the observed event
             self.users[u_index]['observed'].add(i_index)
+            start = time.clock()
             self.__update(d)
+            sum_update_time += (time.clock() - start)
 
-        # stop timer
-        avg_time = (time.clock() - start) / n_test
-
-        return recalls, avg_time
+        return recalls, sum_recommend_time / n_test, sum_update_time / n_test
 
     @abstractmethod
     def __clear(self):
