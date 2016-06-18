@@ -185,22 +185,25 @@ datasets = ['ML1M', 'ML100k', 'LastFM']
 @click.option('--dataset', type=click.Choice(datasets), default=datasets[0], help='Choose a dataset')
 @click.option('--window_size', default=5000, help='Window size of the simple moving average for incremental evaluation.')
 @click.option('--n_epoch', default=1, help='Number of epochs for batch training.')
-def cli(model, dataset, window_size, n_epoch):
+@click.option('--n_trial', default=1, help='Number of trials under the same setting.')
+def cli(model, dataset, window_size, n_epoch, n_trial):
     exp = Runner(dataset=dataset, window_size=window_size, n_epoch=n_epoch)
 
-    if model == 'static-MF' or model == 'iMF':
-        res = exp.iMF(is_static=True) if model == 'static-MF' else exp.iMF()
-    elif model == 'sketch':
-        res = exp.sketch()
-    elif model == 'random':
-        res = exp.random()
-    elif model == 'popular':
-        res = exp.popular()
-    elif model == 'static-FMs' or model == 'iFMs':
-        res = exp.iFMs(is_static=True) if model == 'static-FMs' else exp.iFMs()
+    for i in range(n_trial):
+        if model == 'static-MF' or model == 'iMF':
+            res = exp.iMF(is_static=True) if model == 'static-MF' else exp.iMF()
+        elif model == 'sketch':
+            res = exp.sketch()
+        elif model == 'random':
+            res = exp.random()
+        elif model == 'popular':
+            res = exp.popular()
+        elif model == 'static-FMs' or model == 'iFMs':
+            res = exp.iFMs(is_static=True) if model == 'static-FMs' else exp.iFMs()
 
-    recalls, avg_recommend, avg_update = res
-    save('results/%s_%s_%s.txt' % (dataset, model, window_size), recalls, avg_recommend, avg_update)
+        recalls, avg_recommend, avg_update = res
+        save('results/%s_%s_%s_%s.txt' % (dataset, model, window_size, i + 1),
+             recalls, avg_recommend, avg_update)
 
 if __name__ == '__main__':
     cli()
