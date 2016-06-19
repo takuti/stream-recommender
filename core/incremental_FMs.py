@@ -18,10 +18,10 @@ class IncrementalFMs(Base):
     """
 
     def __init__(
-            self, contexts, is_static=False, k=40, l2_reg_w0=2., l2_reg_w=8., l2_reg_V=16., learn_rate=.01):
+            self, contexts, is_static=False, k=40, l2_reg_w0=2., l2_reg_w=8., l2_reg_V=16., learn_rate=.004):
 
         self.contexts = contexts
-        self.p = contexts['user'] + contexts['item']
+        self.p = np.sum(list(contexts.values()))
 
         self.is_static = is_static
 
@@ -105,7 +105,7 @@ class IncrementalFMs(Base):
         x[d['u_index']] = x[self.n_user + d['i_index']] = 1.
 
         # append contextual variables
-        x = np.concatenate((x, d['user'], d['item']))
+        x = np.concatenate((x, d['user'], d['others'], d['item']))
 
         x_vec = np.array([x]).T  # p x 1
         interaction = np.sum(np.dot(self.V.T, x_vec) ** 2 - np.dot(self.V.T ** 2, x_vec ** 2)) / 2.
@@ -159,13 +159,13 @@ class IncrementalFMs(Base):
         n_target = len(target_i_indices)
 
         # u_mat will be (n_user + n_user_context, n_item) for the target user
-        u = np.concatenate((np.zeros(self.n_user), d['user']))
+        u = np.concatenate((np.zeros(self.n_user), d['user'], d['others']))
         u[d['u_index']] = 1.
         u_vec = np.array([u]).T
         u_mat = sp.csr_matrix(np.repeat(u_vec, n_target, axis=1))
 
         # stack them into (p, n_item) matrix
-        # rows are ordered by [user ID - item ID - user context - item context]
+        # rows are ordered by [user ID - item ID - user context - others - item context]
         mat = sp.vstack((u_mat[:self.n_user], i_mat[:self.n_item], u_mat[self.n_user:], i_mat[self.n_item:]))
 
         # Matrix A and B should be dense (numpy array; rather than scipy CSR matrix) because V is dense.

@@ -16,8 +16,9 @@ class MovieLens100kConverter:
         }
 
         # contexts in this dataset
-        # 1 delta time, 18 genres, and 23 demographics (1 for M/F, 1 for age, 21 for occupation(0-20))
-        self.contexts = {'dt': 1, 'item': 18, 'user': 23}
+        # 18 genres, and 23 demographics (1 for M/F, 1 for age, 21 for occupation(0-20))
+        # 7 for day of week, 18 for the last rated item genres, 7 for the last day of week
+        self.contexts = {'others': 7 + 18 + 7, 'item': 18, 'user': 23}
 
     def convert(self):
         """Create a list of samples and count number of users/items.
@@ -36,6 +37,8 @@ class MovieLens100kConverter:
         head_date = datetime(*time.localtime(self.ratings[0, 3])[:6])
         self.dts = []
 
+        last = {}
+
         for user_id, item_id, rating, timestamp in self.ratings:
             # give an unique user index
             if user_id not in user_ids:
@@ -52,6 +55,18 @@ class MovieLens100kConverter:
             dt = self.__delta(head_date, date)
             self.dts.append(dt)
 
+            weekday_vec = np.zeros(7)
+            weekday_vec[date.weekday()] = 1
+
+            if user_id in last:
+                last_item_vec = last[user_id]['item']
+                last_weekday_vec = last[user_id]['weekday']
+            else:
+                last_item_vec = np.zeros(18)
+                last_weekday_vec = np.zeros(7)
+
+            others = np.concatenate((weekday_vec, last_item_vec, last_weekday_vec))
+
             # true value to compute gradient
             y = 1.
 
@@ -59,12 +74,15 @@ class MovieLens100kConverter:
                 'y': y,
                 'u_index': u_index,
                 'i_index': i_index,
-                'dt': np.array([dt]),
                 'item': movies[item_id],
-                'user': users[user_id]
+                'user': users[user_id],
+                'others': others
             }
 
             self.samples.append(sample)
+
+            # record users' last rated movie features
+            last[user_id] = {'item': movies[item_id], 'weekday': weekday_vec}
 
         self.n_user = len(user_ids)
         self.n_item = len(item_ids)
