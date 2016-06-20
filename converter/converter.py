@@ -3,6 +3,7 @@
 from .MovieLens1M import MovieLens1MConverter
 from .MovieLens100k import MovieLens100kConverter
 from .LastFM import LastFMConverter
+from .SyntheticClick import SyntheticClickConverter
 
 
 class Converter:
@@ -26,6 +27,8 @@ class Converter:
             c = MovieLens100kConverter()
         elif dataset == 'LastFM':
             c = LastFMConverter()
+        elif dataset == 'click':
+            c = SyntheticClickConverter()
 
         c.convert()
         return c

@@ -177,7 +177,7 @@ def save(path, recalls, avg_recommend, avg_update):
 import click
 
 models = ['static-MF', 'iMF', 'static-FMs', 'iFMs', 'sketch', 'random', 'popular']
-datasets = ['ML1M', 'ML100k', 'LastFM']
+datasets = ['ML1M', 'ML100k', 'LastFM', 'click']
 
 
 @click.command()
