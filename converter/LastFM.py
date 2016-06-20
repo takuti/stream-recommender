@@ -14,7 +14,7 @@ class LastFMConverter:
         # others: 1 normalized time
         # user: 1 standardized age, 1 sex, 16 for country
         # item: none
-        self.contexts = [('others', 1), ('user', 18), ('item', 0)]
+        self.contexts = {'others': 1, 'user': 18, 'item': 1}
 
     def convert(self):
         """Create a list of samples and count number of users/items.
@@ -40,7 +40,7 @@ class LastFMConverter:
                 'u_index': row['u_index'],
                 'i_index': row['i_index'],
                 'user': user,
-                'item': np.array([]),  # no detail about items
+                'item': np.array([0.]),  # no detail about items
                 'others': np.array([row['time']])
             }
 
