@@ -20,8 +20,9 @@ from converter.converter import Converter
 
 class Runner:
 
-    def __init__(self, dataset='ML1M', window_size=5000, n_epoch=1):
+    def __init__(self, dataset='ML1M', window_size=5000, at=10, n_epoch=1):
         self.window_size = window_size
+        self.at = at
 
         # number of epochs for the batch training
         self.n_epoch = n_epoch
@@ -161,11 +162,14 @@ class Runner:
         model.fit(
             self.data.samples[:self.data.n_batch_train],
             self.data.samples[self.data.n_batch_train:batch_tail],
+            at=self.at,
             n_epoch=self.n_epoch
         )
 
         # 70% incremental evaluation and updating
-        res = model.evaluate(self.data.samples[batch_tail:], window_size=self.window_size)
+        res = model.evaluate(self.data.samples[batch_tail:],
+                             window_size=self.window_size,
+                             at=self.at)
 
         return model, res
 
@@ -184,10 +188,11 @@ datasets = ['ML1M', 'ML100k', 'LastFM', 'click']
 @click.option('--model', type=click.Choice(models), default=models[0], help='Choose a factorization model')
 @click.option('--dataset', type=click.Choice(datasets), default=datasets[0], help='Choose a dataset')
 @click.option('--window_size', default=5000, help='Window size of the simple moving average for incremental evaluation.')
+@click.option('--at', default=10, help='Evaluation is done by recall@{at}.')
 @click.option('--n_epoch', default=1, help='Number of epochs for batch training.')
 @click.option('--n_trial', default=1, help='Number of trials under the same setting.')
-def cli(model, dataset, window_size, n_epoch, n_trial):
-    exp = Runner(dataset=dataset, window_size=window_size, n_epoch=n_epoch)
+def cli(model, dataset, window_size, at, n_epoch, n_trial):
+    exp = Runner(dataset=dataset, window_size=window_size, at=at, n_epoch=n_epoch)
 
     for i in range(n_trial):
         if model == 'static-MF' or model == 'iMF':
