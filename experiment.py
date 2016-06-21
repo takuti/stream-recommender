@@ -20,7 +20,9 @@ from converter.converter import Converter
 
 class Runner:
 
-    def __init__(self, dataset='ML1M', window_size=5000, at=10, n_epoch=1):
+    def __init__(self, params, dataset='ML1M', window_size=5000, at=10, n_epoch=1):
+        self.params = params
+
         self.window_size = window_size
         self.at = at
 
@@ -54,7 +56,10 @@ class Runner:
             logger.debug('# iMF')
 
         def create():
-            return IncrementalMF(is_static)
+            return IncrementalMF(is_static,
+                                 int(self.params['k']),
+                                 self.params['l2_reg'],
+                                 self.params['learn_rate'])
 
         model, res = self.__run(create)
         return res
@@ -76,7 +81,12 @@ class Runner:
             logger.debug('# iFMs')
 
         def create():
-            return IncrementalFMs(contexts=self.data.contexts, is_static=is_static)
+            return IncrementalFMs(self.data.contexts, is_static,
+                                  int(self.params['k']),
+                                  self.params['l2_reg_w0'],
+                                  self.params['l2_reg_w'],
+                                  self.params['l2_reg_V'],
+                                  self.params['learn_rate'])
 
         model, res = self.__run(create)
 
@@ -174,25 +184,40 @@ class Runner:
         return model, res
 
 
+import click
+import configparser
+
+
 def save(path, recalls, avg_recommend, avg_update):
     with open(path, 'w') as f:
         f.write('\n'.join(map(str, np.append(np.array([avg_recommend, avg_update]), recalls))))
 
-import click
-
-models = ['static-MF', 'iMF', 'static-FMs', 'iFMs', 'sketch', 'random', 'popular']
-datasets = ['ML1M', 'ML100k', 'LastFM', 'click']
-
 
 @click.command()
-@click.option('--model', type=click.Choice(models), default=models[0], help='Choose a factorization model')
-@click.option('--dataset', type=click.Choice(datasets), default=datasets[0], help='Choose a dataset')
-@click.option('--window_size', default=5000, help='Window size of the simple moving average for incremental evaluation.')
-@click.option('--at', default=10, help='Evaluation is done by recall@{at}.')
-@click.option('--n_epoch', default=1, help='Number of epochs for batch training.')
-@click.option('--n_trial', default=1, help='Number of trials under the same setting.')
-def cli(model, dataset, window_size, at, n_epoch, n_trial):
-    exp = Runner(dataset=dataset, window_size=window_size, at=at, n_epoch=n_epoch)
+@click.option('--config', '-f', default='config/example.ini', help='Give a path to your config file.')
+def cli(config):
+
+    # parse given config file
+    parser = configparser.ConfigParser()
+    parser.read(config)
+
+    c = parser['Common']
+    dataset = c.get('Dataset')  # ['ML1M', 'ML100k', 'LastFM', 'click']
+    window_size = c.getint('WindowSize', 5000)
+    at = c.getint('At', 10)
+    n_trial = c.getint('Trial', 1)
+
+    # ['static-MF', 'iMF', 'static-FMs', 'iFMs', 'sketch', 'random', 'popular']
+    m = parser['Model']
+    model = m['Name']
+    n_epoch = m.getint('Epoch', 1)
+
+    if 'Parameters' in parser:
+        params = dict([(k, float(v)) for k, v in parser['Parameters'].items()])
+    else:
+        params = {}
+
+    exp = Runner(params=params, dataset=dataset, window_size=window_size, at=at, n_epoch=n_epoch)
 
     for i in range(n_trial):
         if model == 'static-MF' or model == 'iMF':
