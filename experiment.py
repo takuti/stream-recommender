@@ -85,7 +85,7 @@ class Runner:
                                   int(self.params['k']),
                                   self.params['l2_reg_w0'],
                                   self.params['l2_reg_w'],
-                                  self.params['l2_reg_V'],
+                                  self.params['l2_reg_v'],
                                   self.params['learn_rate'])
 
         model, res = self.__run(create)
