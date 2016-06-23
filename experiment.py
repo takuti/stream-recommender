@@ -1,5 +1,7 @@
 # coding: utf-8
 
+import click
+
 from logging import getLogger, StreamHandler, Formatter, DEBUG
 logger = getLogger(__name__)
 handler = StreamHandler()
@@ -185,18 +187,13 @@ class Runner:
         return model, res
 
 
-import click
-import configparser
-
-
-def save(path, recalls, avg_recommend, avg_update):
-    with open(path, 'w') as f:
-        f.write('\n'.join(map(str, np.append(np.array([avg_recommend, avg_update]), recalls))))
-
-
 @click.command()
-@click.option('--config', '-f', default='config/example.ini', help='Give a path to your config file.')
+@click.option('--config', '-f', help='Give a path to your config file.')
 def cli(config):
+
+    def save(path, recalls, avg_recommend, avg_update):
+        with open(path, 'w') as f:
+            f.write('\n'.join(map(str, np.append(np.array([avg_recommend, avg_update]), recalls))))
 
     # parse given config file
     parser = configparser.ConfigParser()
@@ -236,5 +233,7 @@ def cli(config):
         save('results/%s_%s_%s_%s.txt' % (dataset, model, window_size, i + 1),
              recalls, avg_recommend, avg_update)
 
+
 if __name__ == '__main__':
+    import configparser
     cli()
