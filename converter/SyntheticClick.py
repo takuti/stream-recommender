@@ -14,8 +14,12 @@ class SyntheticClickConverter:
         # contexts in this dataset
         # others: none
         # user: 1 normalized age, 1 sex, 50 for living state
-        # item: none
-        self.contexts = {'others': 1, 'user': 52, 'item': 1}
+        # item: 3 garegories
+        self.contexts = {'others': 1, 'user': 52, 'item': 3}
+
+        # 3 ad categories (e.g. life, tech, money) for 5 ad
+        # (Google also has ad interest categories: https://support.google.com/ads/answer/2842480?hl=en)
+        self.categories = [0, 0, 2, 2, 1]
 
     def convert(self):
         """Create a list of samples and count number of users/items.
@@ -24,7 +28,7 @@ class SyntheticClickConverter:
 
         clicks = []
         with open('converter/click.tsv') as f:
-            clicks = list(map(lambda l: list(map(float, l.rstrip().split('\t'))), f.readlines()))
+            clicks = list(map(lambda l: list(map(int, l.rstrip().split('\t'))), f.readlines()))
 
         self.samples = []
 
@@ -32,14 +36,16 @@ class SyntheticClickConverter:
         n_geo = 50  # 50 states in US
 
         ad_ids = []
+        ad_categories = []
 
         for ad_id, year, geo, sex in clicks:
             if ad_id not in ad_ids:
                 ad_ids.append(ad_id)
+                ad_categories.append(self.categories[ad_id])
             i_index = ad_ids.index(ad_id)
 
             geo_vec = np.zeros(n_geo)
-            geo_vec[int(geo) - 1] = 1.
+            geo_vec[geo - 1] = 1.
 
             # normalized age in [0, 1]
             # clickgenerator.jl generates a birth year in [1930, 2000]
@@ -47,12 +53,16 @@ class SyntheticClickConverter:
 
             user = np.concatenate((np.array([age]), np.array([sex]), geo_vec))
 
+            # category vector
+            category = np.zeros(3)
+            category[ad_categories[i_index]] = 1
+
             sample = {
                 'y': 1,
-                'u_index': u_index,
+                'u_index': 0,
                 'i_index': i_index,
                 'user': user,
-                'item': np.array([0.]),  # no detail about items
+                'item': category,
                 'others': np.array([0.])
             }
 
