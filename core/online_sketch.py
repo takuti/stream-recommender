@@ -22,6 +22,27 @@ class OnlineSketch(Base):
 
         self._Base__clear()
 
+    def create_proj_mat(self, size):
+        """Create a random projection matrix
+
+        [1] D. Achlioptas. Database-friendly random projections: Johnson-Lindenstrauss with binary coins.
+        [2] P. Li, et al. Very sparse random projections.
+
+        http://scikit-learn.org/stable/modules/random_projection.html#sparse-random-projection
+        """
+
+        # [1]
+        # return np.random.choice([-np.sqrt(3), 0, np.sqrt(3)], size=size, p=[1 / 6, 2 / 3, 1 / 6])
+
+        # [2]
+        s = 1 / 0.2
+        return np.random.choice([-np.sqrt(s / self.k), 0, np.sqrt(s / self.k)], size=size, p=[1 / (2 * s), 1 - 1 / s, 1 / (2 * s)])
+
+    def insert_new_proj_col(self, offset):
+        col = self.create_proj_mat((self.k, 1))
+        R = self.R.toarray()
+        self.R = sp.csr_matrix(np.concatenate((R[:, :offset], col, R[:, offset:]), axis=1))
+
     def _Base__clear(self):
         self.n_user = 0
         self.users = {}
@@ -33,8 +54,7 @@ class OnlineSketch(Base):
 
         self.B = np.zeros((self.k, self.ell))
 
-        # random projection matrix
-        self.R = np.random.normal(0., 1 / self.k, (self.k, self.p))
+        self.R = sp.csr_matrix(self.create_proj_mat((self.k, self.p)))
 
     def _Base__check(self, d):
 
@@ -45,9 +65,8 @@ class OnlineSketch(Base):
             self.p += 1
 
             # projection matrix: insert a new column for new user ID
-            col = np.random.normal(0., 1 / self.k, (self.k, 1))
             offset = self.n_user - 1
-            self.R = np.concatenate((self.R[:, :offset], col, self.R[:, offset:]), axis=1)
+            self.insert_new_proj_col(offset)
 
         i_index = d['i_index']
         if i_index not in self.items:
@@ -67,9 +86,8 @@ class OnlineSketch(Base):
                 self.i_mat = sp.csr_matrix(sp.hstack((self.i_mat, i_vec)))
 
             # projection matrix: insert a new column for new item ID
-            col = np.random.normal(0., 1 / self.k, (self.k, 1))
             offset = self.n_user + self.contexts['user'] + self.contexts['others'] + self.n_item - 1
-            self.R = np.concatenate((self.R[:, :offset], col, self.R[:, offset:]), axis=1)
+            self.insert_new_proj_col(offset)
 
     def _Base__update(self, d, is_batch_train=False):
         u = np.append(np.zeros(self.n_user), d['user'])
@@ -80,8 +98,8 @@ class OnlineSketch(Base):
 
         y = np.concatenate((u, d['others'], i))
 
-        y = np.dot(self.R, y)  # random projection
-        y = preprocessing.normalize(np.array([y]), norm='l2').flatten()
+        y = safe_sparse_dot(self.R, np.array([y]).T)  # random projection
+        y = preprocessing.normalize(y, norm='l2', axis=0).flatten()
 
         # combine current sketched matrix with input at time t
         zero_cols = np.where(np.isclose(self.B, 0).all(0) == 1)[0]
