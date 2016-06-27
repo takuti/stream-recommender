@@ -12,12 +12,12 @@ class OnlineSketch(Base):
     """Inspired by: Streaming Anomaly Detection using Online Matrix Sketching
     """
 
-    def __init__(self, contexts):
+    def __init__(self, contexts, k=40):
 
         self.contexts = contexts
         self.p = np.sum(list(contexts.values()))
 
-        self.k = 40  # dimension of projected vectors
+        self.k = k  # dimension of projected vectors
         self.ell = int(np.sqrt(self.k))
 
         self._Base__clear()

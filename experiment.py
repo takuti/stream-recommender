@@ -112,8 +112,7 @@ class Runner:
         logger.debug('# matrix sketching')
 
         def create():
-            return OnlineSketch(
-                contexts=self.data.contexts)
+            return OnlineSketch(contexts=self.data.contexts, k=int(self.params['k']))
 
         model, res = self.__run(create)
 
