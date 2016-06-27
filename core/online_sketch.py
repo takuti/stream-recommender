@@ -21,12 +21,12 @@ class OnlineSketch(Base):
     """
 
     def __init__(self, contexts):
+
         self.contexts = contexts
+        self.p = np.sum(list(contexts.values()))
 
-        # consider a lower triangle w/o self-interaction
-        self.p = contexts['user'] + contexts['item']
-
-        self.ell = int(np.sqrt(self.p))
+        self.k = 40  # dimension of projected vectors
+        self.ell = int(np.sqrt(self.k))
 
         self._Base__clear()
 
@@ -42,6 +42,11 @@ class OnlineSketch(Base):
             n_epoch (int): Number of epochs for the batch training. (fixed by 1)
 
         """
+        # make initial status for batch training
+        for d in train_samples:
+            self._Base__check(d)
+            self.users[d['u_index']]['observed'].add(d['i_index'])
+
         # for batch evaluation, temporarily save new users info
         for d in test_samples:
             self._Base__check(d)
@@ -49,15 +54,18 @@ class OnlineSketch(Base):
         Y0 = np.zeros((self.p, len(train_samples)))
 
         # 20%: update models
-        for i, d in enumerate(train_samples):
-            self._Base__check(d)
-            self.users[d['u_index']]['observed'].add(d['i_index'])
+        for j, d in enumerate(train_samples):
+            u = np.append(np.zeros(self.n_user), d['user'])
+            u[d['u_index']] = 1.
 
-            y = d['user']
-            y = np.append(y, d['item'])
+            i = np.append(np.zeros(self.n_item), d['item'])
+            i[d['i_index']] = 1.
 
-            Y0[:, i] = y
+            y = np.concatenate((u, d['others'], i))
 
+            Y0[:, j] = y
+
+        Y0 = np.dot(self.R, Y0)  # rabdom projection
         Y0 = preprocessing.normalize(Y0, norm='l2', axis=0)
 
         # initial ell orthogonal bases are computed by truncated SVD
@@ -95,24 +103,56 @@ class OnlineSketch(Base):
 
         self.i_mat = sp.csr_matrix([])
 
-        self.B = np.random.normal(0., 0.1, (self.p, self.ell))
+        self.B = np.zeros((self.p, self.ell))
+
+        # random projection matrix
+        self.R = np.random.normal(0., 1 / self.k, (self.k, self.p))
 
     def _Base__check(self, d):
+
         u_index = d['u_index']
         if u_index not in self.users:
             self.users[u_index] = {'observed': set()}
             self.n_user += 1
+            self.p += 1
+
+            # projection matrix: insert a new column for new user ID
+            col = np.random.normal(0., 1 / self.k, (self.k, 1))
+            offset = self.n_user - 1
+            self.R = np.concatenate((self.R[:, :offset], col, self.R[:, offset:]), axis=1)
 
         i_index = d['i_index']
         if i_index not in self.items:
             self.items[i_index] = {}
             self.n_item += 1
-            i = sp.csr_matrix(np.array([d['item']]).T)
-            self.i_mat = i if self.i_mat.size == 0 else sp.csr_matrix(sp.hstack((self.i_mat, i)))
+            self.p += 1
+
+            i_vec = np.array([np.append(np.zeros(self.n_item), d['item'])]).T
+            if self.i_mat.size == 0:
+                self.i_mat = i_vec
+            else:
+                # item matrix: insert a new row for new item ID
+                z = np.zeros((1, self.i_mat.shape[1]))
+                self.i_mat = sp.csr_matrix(sp.vstack((self.i_mat[:(self.n_item - 1)],
+                                                      z,
+                                                      self.i_mat[(self.n_item - 1):])))
+                self.i_mat = sp.csr_matrix(sp.hstack((self.i_mat, i_vec)))
+
+            # projection matrix: insert a new column for new item ID
+            col = np.random.normal(0., 1 / self.k, (self.k, 1))
+            offset = self.n_user + self.contexts['user'] + self.contexts['others'] + self.n_item - 1
+            self.R = np.concatenate((self.R[:, :offset], col, self.R[:, offset:]), axis=1)
 
     def _Base__update(self, d, is_batch_train=False):
-        y = d['user']
-        y = np.append(y, d['item'])
+        u = np.append(np.zeros(self.n_user), d['user'])
+        u[d['u_index']] = 1.
+
+        i = np.append(np.zeros(self.n_item), d['item'])
+        i[d['i_index']] = 1.
+
+        y = np.concatenate((u, d['others'], i))
+
+        y = np.dot(self.R, y)  # random projection
         y = preprocessing.normalize(np.array([y]), norm='l2').flatten()
 
         # combine current sketched matrix with input at time t
@@ -139,13 +179,18 @@ class OnlineSketch(Base):
         n_target = len(target_i_indices)
 
         # u_mat will be (n_user_context, n_item) for the target user
-        u_mat = sp.csr_matrix(np.repeat(np.array([d['user']]).T, n_target, axis=1))
+        u = np.concatenate((np.zeros(self.n_user), d['user'], d['others']))
+        u[d['u_index']] = 1.
+        u_vec = np.array([u]).T
+
+        u_mat = sp.csr_matrix(np.repeat(u_vec, n_target, axis=1))
 
         # stack them into (p, n_item) matrix
         Y = sp.vstack((u_mat, i_mat))
-        Y = sp.csr_matrix(preprocessing.normalize(Y.toarray(), norm='l2', axis=0))
+        Y = safe_sparse_dot(self.R, Y)  # random projection -> dense output
+        Y = sp.csr_matrix(preprocessing.normalize(Y, norm='l2', axis=0))
 
-        X = np.identity(self.p) - np.dot(self.U, self.U.T)
+        X = np.identity(self.k) - np.dot(self.U, self.U.T)
         A = safe_sparse_dot(X, Y, dense_output=True)
 
         scores = ln.norm(A, axis=0, ord=2)
