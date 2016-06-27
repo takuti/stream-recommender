@@ -1,11 +1,3 @@
-from logging import getLogger, StreamHandler, Formatter, DEBUG
-logger = getLogger(__name__)
-handler = StreamHandler()
-handler.setFormatter(Formatter('[%(process)d] %(message)s'))
-handler.setLevel(DEBUG)
-logger.setLevel(DEBUG)
-logger.addHandler(handler)
-
 from .base import Base
 
 import numpy as np
@@ -30,70 +22,6 @@ class OnlineSketch(Base):
 
         self._Base__clear()
 
-    # Since a batch training procedure is totally different from the matrix factorization techniques,
-    # a public method "fit" is overridden.
-    def fit(self, train_samples, test_samples, n_epoch=1, at=40):
-        """Learn the "positve" sketched matrix using the first 30% positive samples to avoid cold-start.
-
-        Args:
-            train_samples (list of dict): Positive training samples (0-20%).
-            test_sample (list of dict): Test samples (20-30%).
-            at (int): Evaluation metric of this batch pre-training will be recall@{at}.
-            n_epoch (int): Number of epochs for the batch training. (fixed by 1)
-
-        """
-        # make initial status for batch training
-        for d in train_samples:
-            self._Base__check(d)
-            self.users[d['u_index']]['observed'].add(d['i_index'])
-
-        # for batch evaluation, temporarily save new users info
-        for d in test_samples:
-            self._Base__check(d)
-
-        Y0 = np.zeros((self.p, len(train_samples)))
-
-        # 20%: update models
-        for j, d in enumerate(train_samples):
-            u = np.append(np.zeros(self.n_user), d['user'])
-            u[d['u_index']] = 1.
-
-            i = np.append(np.zeros(self.n_item), d['item'])
-            i[d['i_index']] = 1.
-
-            y = np.concatenate((u, d['others'], i))
-
-            Y0[:, j] = y
-
-        Y0 = np.dot(self.R, Y0)  # rabdom projection
-        Y0 = preprocessing.normalize(Y0, norm='l2', axis=0)
-
-        # initial ell orthogonal bases are computed by truncated SVD
-        U, s, V = ln.svd(Y0, full_matrices=False)
-        self.U = U[:, :self.ell]
-        s = s[:self.ell]
-
-        # shrink step in the Frequent Directions algorithm
-        # (shrink singular values based on the squared smallest singular value)
-        delta = s[-1] ** 2
-        s = np.sqrt(s ** 2 - delta)
-
-        # define initial sketched matrix B
-        self.B = np.dot(self.U, np.diag(s))
-
-        recall = self.batch_evaluate(test_samples, at)
-        logger.debug('done: 20%% initial sketching with recall@%d = %f' % (at, recall[-1]))
-
-        logger.debug('[' + ', '.join([str(r) for r in recall]) + ']')
-
-        # for further incremental evaluation,
-        # the model is incrementally updated by using the 10% samples
-        for d in test_samples:
-            self.users[d['u_index']]['observed'].add(d['i_index'])
-            self._Base__update(d)
-
-        logger.debug('done: additional learning for the 10% batch test samples')
-
     def _Base__clear(self):
         self.n_user = 0
         self.users = {}
@@ -103,7 +31,7 @@ class OnlineSketch(Base):
 
         self.i_mat = sp.csr_matrix([])
 
-        self.B = np.zeros((self.p, self.ell))
+        self.B = np.zeros((self.k, self.ell))
 
         # random projection matrix
         self.R = np.random.normal(0., 1 / self.k, (self.k, self.p))
@@ -156,7 +84,9 @@ class OnlineSketch(Base):
         y = preprocessing.normalize(np.array([y]), norm='l2').flatten()
 
         # combine current sketched matrix with input at time t
-        self.B[:, (self.ell - 1)] = y
+        zero_cols = np.where(np.isclose(self.B, 0).all(0) == 1)[0]
+        j = zero_cols[0] if zero_cols.size != 0 else self.ell - 1  # left-most all-zero column in B
+        self.B[:, j] = y
 
         U, s, V = ln.svd(self.B, full_matrices=False)
 
