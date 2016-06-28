@@ -37,4 +37,8 @@ class Popular(Base):
 
     def _Base__recommend(self, d, target_i_indices, at=10):
         sorted_indices = np.argsort(self.freq[target_i_indices])[::-1]
-        return target_i_indices[sorted_indices][:at]
+
+        if at > 0:
+            return target_i_indices[sorted_indices][:at]
+        else:
+            return target_i_indices[sorted_indices]

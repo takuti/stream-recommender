@@ -89,10 +89,14 @@ class Base:
                 self.__update(d, is_batch_train=True)
 
             # 10%: evaluate the current model
-            recall = self.batch_evaluate(test_samples, at)
-            logger.debug('epoch %2d: recall@%d = %f' % (epoch + 1, at, recall[-1]))
+            res = self.batch_evaluate(test_samples, at)
+            if at > 0:
+                logger.debug('epoch %2d: recall@%d = %f' % (epoch + 1, at, res[-1]))
+            else:
+                logger.debug('epoch %2d: MPR = %f' % (epoch + 1, res))
 
-        logger.debug('[' + ', '.join([str(r) for r in recall]) + ']')
+        if at > 0:
+            logger.debug('[' + ', '.join([str(r) for r in res]) + ']')
 
     def batch_evaluate(self, test_samples, at):
         """Evaluate the current model by using the given test samples.
@@ -104,7 +108,10 @@ class Base:
                         top-{at} recommendation list has a true item -> TP++
 
         """
-        n_tp = np.zeros(at)
+        if at > 0:
+            n_tp = np.zeros(at)
+        else:
+            s_MPR = 0.
 
         all_items = set(range(self.n_item))
         for i, d in enumerate(test_samples):
@@ -120,13 +127,20 @@ class Base:
             target_i_indices = np.asarray(list(unobserved))
             recos = self.__recommend(d, target_i_indices, at)
 
-            # is a true sample in the top-{at} recommendation list?
-            for j, reco_i_index in enumerate(recos):
-                if reco_i_index == d['i_index']:
-                    n_tp[j:] += 1
-                    break
+            if at > 0:
+                # is a true sample in the top-{at} recommendation list?
+                for j, reco_i_index in enumerate(recos):
+                    if reco_i_index == d['i_index']:
+                        n_tp[j:] += 1
+                        break
+            else:
+                pos = np.where(recos == d['i_index'])[0][0]
+                s_MPR += (pos / (len(recos) - 1) * 100)
 
-        return n_tp / float(len(test_samples))
+        if at > 0:
+            return n_tp / float(len(test_samples))
+        else:
+            return s_MPR / float(len(test_samples))
 
     def evaluate(self, test_samples, window_size=5000, at=10):
         """Iterate recommend/update procedure and compute incremental recall.
@@ -136,12 +150,12 @@ class Base:
             at (int): Top-{at} items will be recommended in each iteration.
 
         Returns:
-            float: incremental recalls@{at}.
+            float: incremental recalls@{at} / MPRs.
             float: Avg. recommend+update time in second.
 
         """
         n_test = len(test_samples)
-        recalls = np.zeros(n_test)
+        results = np.zeros(n_test)
 
         window = np.zeros(window_size)
         sum_window = 0.
@@ -173,12 +187,16 @@ class Base:
             # i.e. score the recommendation list based on the true observed item
             wi = i % window_size
 
-            old_recall = window[wi]
-            new_recall = 1. if (i_index in recos) else 0.
-            window[wi] = new_recall
+            old = window[wi]
+            if at > 0:
+                new = 1. if (i_index in recos) else 0.
+            else:
+                pos = np.where(recos == i_index)[0][0]
+                new = pos / (len(recos) - 1) * 100
+            window[wi] = new
 
-            sum_window = sum_window - old_recall + new_recall
-            recalls[i] = sum_window / min(i + 1, window_size)
+            sum_window = sum_window - old + new
+            results[i] = sum_window / min(i + 1, window_size)
 
             # Step 2: update the model with the observed event
             self.users[u_index]['observed'].add(i_index)
@@ -186,7 +204,7 @@ class Base:
             self.__update(d)
             sum_update_time += (time.clock() - start)
 
-        return recalls, sum_recommend_time / n_test, sum_update_time / n_test
+        return results, sum_recommend_time / n_test, sum_update_time / n_test
 
     @abstractmethod
     def __clear(self):
@@ -255,4 +273,7 @@ class Base:
         """
 
         sorted_indices = np.argsort(scores)
-        return target_i_indices[sorted_indices][:at]
+        if at > 0:
+            return target_i_indices[sorted_indices][:at]
+        else:
+            return target_i_indices[sorted_indices]
