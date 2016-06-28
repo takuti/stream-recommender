@@ -21,6 +21,8 @@ class SyntheticClickConverter:
         # (Google also has ad interest categories: https://support.google.com/ads/answer/2842480?hl=en)
         self.categories = [0, 0, 2, 2, 1]
 
+        self.can_repeat = True
+
     def convert(self):
         """Create a list of samples and count number of users/items.
 

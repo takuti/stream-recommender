@@ -20,6 +20,8 @@ class MovieLens1MConverter:
         # 7 for day of week, 18 for the last rated item genres, 7 for the last day of week
         self.contexts = {'others': 7 + 18 + 7, 'item': 18, 'user': 23}
 
+        self.can_repeat = False
+
     def convert(self):
         """Create a list of samples and count number of users/items.
 

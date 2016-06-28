@@ -16,6 +16,8 @@ class LastFMConverter:
         # item: none
         self.contexts = {'others': 1, 'user': 18, 'item': 1}
 
+        self.can_repeat = True
+
     def convert(self):
         """Create a list of samples and count number of users/items.
 

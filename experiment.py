@@ -167,6 +167,7 @@ class Runner:
         batch_tail = self.data.n_batch_train + self.data.n_batch_test
 
         model = callback()
+        model.set_can_repeat(self.data.can_repeat)
 
         # pre-train
         # 20% for batch training | 10% for batch evaluate

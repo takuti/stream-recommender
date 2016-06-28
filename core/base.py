@@ -35,6 +35,9 @@ class Base:
         # initialize models and user/item information
         self.__clear()
 
+    def set_can_repeat(self, can_repeat):
+        self.can_repeat = can_repeat
+
     def fit(self, train_samples, test_samples, at=10, n_epoch=1):
         """Train a model using the first 30% positive samples to avoid cold-start.
 
@@ -105,9 +108,15 @@ class Base:
 
         all_items = set(range(self.n_item))
         for i, d in enumerate(test_samples):
-            # make recommendation for all unobserved items
-            unobserved = all_items - self.users[d['u_index']]['observed']
-            unobserved.add(d['i_index'])  # true item itself must be in the recommendation candidates
+
+            # check if the data allows users to interact the same items repeatedly
+            unobserved = all_items
+            if not self.can_repeat:
+                # make recommendation for all unobserved items
+                unobserved -= self.users[d['u_index']]['observed']
+                # true item itself must be in the recommendation candidates
+                unobserved.add(d['i_index'])
+
             target_i_indices = np.asarray(list(unobserved))
             recos = self.__recommend(d, target_i_indices, at)
 
@@ -147,10 +156,12 @@ class Base:
             u_index = d['u_index']
             i_index = d['i_index']
 
-            # unobserved items
-            # * item i interacted by user u must be in the recommendation candidate
-            unobserved = set(range(self.n_item)) - self.users[u_index]['observed']
-            unobserved.add(i_index)
+            # target items (all or unobserved depending on a detaset)
+            unobserved = set(range(self.n_item))
+            if not self.can_repeat:
+                unobserved -= self.users[u_index]['observed']
+                # * item i interacted by user u must be in the recommendation candidate
+                unobserved.add(i_index)
             target_i_indices = np.asarray(list(unobserved))
 
             # make top-{at} recommendation for the 1001 items
