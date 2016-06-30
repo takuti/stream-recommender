@@ -84,6 +84,25 @@ class RandomProjection(BaseProjection):
                                 p=[1 / (2 * s), 1 - 1 / s, 1 / (2 * s)])
 
 
+class RandomMaclaurinProjection(BaseProjection):
+
+    def __init__(self, k, p):
+        self.k = k
+
+        self.W1 = np.random.choice([1, -1], size=(k, p))
+        self.W2 = np.random.choice([1, -1], size=(k, p))
+
+    def insert_proj_col(self, offset):
+        col = np.random.choice([1, -1], size=(self.k, 1))
+        self.W1 = np.concatenate((self.W1[:, :offset], col, self.W1[:, offset:]), axis=1)
+
+        col = np.random.choice([1, -1], size=(self.k, 1))
+        self.W2 = np.concatenate((self.W2[:, :offset], col, self.W2[:, offset:]), axis=1)
+
+    def reduce(self, Y):
+        return safe_sparse_dot(self.W1, Y) * safe_sparse_dot(self.W2, Y) / np.sqrt(self.k)
+
+
 class TensorSketchProjection(BaseProjection):
 
     def __init__(self, k, p):
@@ -150,7 +169,7 @@ class OnlineSketch(Base):
         self.B = np.zeros((self.k, self.ell))
 
         # initialize projection instance
-        self.proj = TensorSketchProjection(self.k, self.p)
+        self.proj = RandomMaclaurinProjection(self.k, self.p)
 
     def _Base__check(self, d):
 
