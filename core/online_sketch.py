@@ -39,9 +39,20 @@ class OnlineSketch(Base):
         return np.random.choice([-np.sqrt(s / self.k), 0, np.sqrt(s / self.k)], size=size, p=[1 / (2 * s), 1 - 1 / s, 1 / (2 * s)])
 
     def insert_new_proj_col(self, offset):
-        col = self.create_proj_mat((self.k, 1))
-        R = self.R.toarray()
-        self.R = sp.csr_matrix(np.concatenate((R[:, :offset], col, R[:, offset:]), axis=1))
+        # col = self.create_proj_mat((self.k, 1))
+        # R = self.R.toarray()
+        # self.R = sp.csr_matrix(np.concatenate((R[:, :offset], col, R[:, offset:]), axis=1))
+
+        self.h1 = np.concatenate((self.h1[:offset],
+                                  np.random.choice(list(range(self.k)), (1, )),
+                                  self.h1[offset:]))
+        self.h2 = np.concatenate((self.h2[:offset],
+                                  np.random.choice(list(range(self.k)), (1, )),
+                                  self.h2[offset:]))
+        self.h1_indices = [np.where(self.h1 == j)[0] for j in range(self.k)]
+        self.h2_indices = [np.where(self.h2 == j)[0] for j in range(self.k)]
+        self.s1 = np.concatenate((self.s1[:offset], np.random.choice([1, -1], (1, )), self.s1[offset:]))
+        self.s2 = np.concatenate((self.s2[:offset], np.random.choice([1, -1], (1, )), self.s2[offset:]))
 
     def _Base__clear(self):
         self.n_user = 0
@@ -54,7 +65,24 @@ class OnlineSketch(Base):
 
         self.B = np.zeros((self.k, self.ell))
 
-        self.R = sp.csr_matrix(self.create_proj_mat((self.k, self.p)))
+        # sparse random projection
+        # self.R = sp.csr_matrix(self.create_proj_mat((self.k, self.p)))
+
+        # tensor sketch projection
+        self.h1 = np.random.choice(list(range(self.k)), size=self.p)
+        self.h2 = np.random.choice(list(range(self.k)), size=self.p)
+        self.h1_indices = [np.where(self.h1 == j)[0] for j in range(self.k)]
+        self.h2_indices = [np.where(self.h2 == j)[0] for j in range(self.k)]
+        self.s1 = np.random.choice([1, -1], size=self.p)
+        self.s2 = np.random.choice([1, -1], size=self.p)
+
+    def sketch(self, X):
+        """X: (p, n)
+
+        """
+        sketch1 = np.array([np.sum(np.array([self.s1[idx]]).T * X[idx], axis=0) for idx in self.h1_indices])
+        sketch2 = np.array([np.sum(np.array([self.s2[idx]]).T * X[idx], axis=0) for idx in self.h2_indices])
+        return sketch1, sketch2
 
     def _Base__check(self, d):
 
@@ -89,6 +117,15 @@ class OnlineSketch(Base):
             offset = self.n_user + self.contexts['user'] + self.contexts['others'] + self.n_item - 1
             self.insert_new_proj_col(offset)
 
+    def __reduce(self, Y):
+        # return safe_sparse_dot(self.R, Y)  # random projection -> dense output
+
+        if sp.isspmatrix(Y):
+            Y = Y.toarray()
+
+        sketch1, sketch2 = self.sketch(Y)
+        return np.real(np.fft.ifft(np.fft.fft(sketch1, axis=0) * np.fft.fft(sketch2, axis=0), axis=0))
+
     def _Base__update(self, d, is_batch_train=False):
         u = np.append(np.zeros(self.n_user), d['user'])
         u[d['u_index']] = 1.
@@ -98,8 +135,9 @@ class OnlineSketch(Base):
 
         y = np.concatenate((u, d['others'], i))
 
-        y = safe_sparse_dot(self.R, np.array([y]).T)  # random projection
-        y = preprocessing.normalize(y, norm='l2', axis=0).flatten()
+        y = np.array([y]).T
+        y = self.__reduce(y)
+        y = np.ravel(preprocessing.normalize(y, norm='l2', axis=0))
 
         # combine current sketched matrix with input at time t
         zero_cols = np.where(np.isclose(self.B, 0).all(0) == 1)[0]
@@ -135,7 +173,8 @@ class OnlineSketch(Base):
 
         # stack them into (p, n_item) matrix
         Y = sp.vstack((u_mat, i_mat))
-        Y = safe_sparse_dot(self.R, Y)  # random projection -> dense output
+
+        Y = self.__reduce(Y)
         Y = sp.csr_matrix(preprocessing.normalize(Y, norm='l2', axis=0))
 
         X = np.identity(self.k) - np.dot(self.U, self.U.T)
