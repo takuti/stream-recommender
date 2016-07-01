@@ -177,41 +177,20 @@ class OnlineSketch(Base):
         if u_index not in self.users:
             self.users[u_index] = {'observed': set()}
             self.n_user += 1
-            self.p += 1
-
-            # projection matrix: insert a new column for new user ID
-            offset = self.n_user - 1
-            self.proj.insert_proj_col(offset)
 
         i_index = d['i_index']
         if i_index not in self.items:
             self.items[i_index] = {}
             self.n_item += 1
-            self.p += 1
 
-            i_vec = np.array([np.append(np.zeros(self.n_item), d['item'])]).T
+            i_vec = sp.csr_matrix(np.array([d['item']]).T)
             if self.i_mat.size == 0:
                 self.i_mat = i_vec
             else:
-                # item matrix: insert a new row for new item ID
-                z = np.zeros((1, self.i_mat.shape[1]))
-                self.i_mat = sp.csr_matrix(sp.vstack((self.i_mat[:(self.n_item - 1)],
-                                                      z,
-                                                      self.i_mat[(self.n_item - 1):])))
                 self.i_mat = sp.csr_matrix(sp.hstack((self.i_mat, i_vec)))
 
-            # projection matrix: insert a new column for new item ID
-            offset = self.n_user + self.contexts['user'] + self.contexts['others'] + self.n_item - 1
-            self.proj.insert_proj_col(offset)
-
     def _Base__update(self, d, is_batch_train=False):
-        u = np.append(np.zeros(self.n_user), d['user'])
-        u[d['u_index']] = 1.
-
-        i = np.append(np.zeros(self.n_item), d['item'])
-        i[d['i_index']] = 1.
-
-        y = np.concatenate((u, d['others'], i))
+        y = np.concatenate((d['user'], d['others'], d['item']))
         y = self.proj.reduce(np.array([y]).T)
         y = np.ravel(preprocessing.normalize(y, norm='l2', axis=0))
 
@@ -241,8 +220,7 @@ class OnlineSketch(Base):
         n_target = len(target_i_indices)
 
         # u_mat will be (n_user_context, n_item) for the target user
-        u = np.concatenate((np.zeros(self.n_user), d['user'], d['others']))
-        u[d['u_index']] = 1.
+        u = np.concatenate((d['user'], d['others']))
         u_vec = np.array([u]).T
 
         u_mat = sp.csr_matrix(np.repeat(u_vec, n_target, axis=1))
