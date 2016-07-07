@@ -152,7 +152,7 @@ class IncrementalFMs(Base):
             g = err * x[pi] * (prod - x[pi] * self.prev_V[pi])
             self.V[pi] = self.prev_V[pi] + 2. * self.learn_rate * (g - self.l2_reg_V * self.prev_V[pi])
 
-    def _Base__recommend(self, d, target_i_indices, at=10):
+    def _Base__recommend(self, d, target_i_indices):
         # i_mat is (n_item_context, n_item) for all possible items
         # extract only target items
         i_mat = self.i_mat[:, target_i_indices]
@@ -187,4 +187,4 @@ class IncrementalFMs(Base):
 
         scores = np.abs(1. - np.ravel(pred))
 
-        return self._Base__scores2recos(scores, target_i_indices, at)
+        return self._Base__scores2recos(scores, target_i_indices)

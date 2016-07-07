@@ -212,7 +212,7 @@ class OnlineSketch(Base):
 
         self.B = np.dot(self.U, np.diag(s))
 
-    def _Base__recommend(self, d, target_i_indices, at=10):
+    def _Base__recommend(self, d, target_i_indices):
         # i_mat is (n_item_context, n_item) for all possible items
         # extract only target items
         i_mat = self.i_mat[:, target_i_indices]
@@ -235,4 +235,4 @@ class OnlineSketch(Base):
 
         scores = ln.norm(A, axis=0, ord=2)
 
-        return self._Base__scores2recos(scores, target_i_indices, at)
+        return self._Base__scores2recos(scores, target_i_indices)

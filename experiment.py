@@ -189,12 +189,11 @@ class Runner:
 
 @click.command()
 @click.option('--config', '-f', help='Give a path to your config file.')
-@click.option('--metric', type=click.Choice(['Recall', 'MPR']), help='Choose an evaluation metric.')
-def cli(config, metric):
+def cli(config):
 
-    def save(path, recalls, avg_recommend, avg_update):
+    def save(path, recalls, MPR, avg_recommend, avg_update):
         with open(path, 'w') as f:
-            f.write('\n'.join(map(str, np.append(np.array([avg_recommend, avg_update]), recalls))))
+            f.write('\n'.join(map(str, np.append(np.array([avg_recommend, avg_update, MPR]), recalls))))
 
     # parse given config file
     parser = configparser.ConfigParser()
@@ -207,7 +206,7 @@ def cli(config, metric):
 
     # Evaluation metric: Recall or MPR (Mean Percentage Ranking)
     # at=0 indicates MPR-based evaluation
-    at = c.getint('At', 10) if metric == 'Recall' else 0
+    at = c.getint('At', 10)
 
     # ['static-MF', 'iMF', 'static-FMs', 'iFMs', 'sketch', 'random', 'popular']
     m = parser['Model']
@@ -233,9 +232,9 @@ def cli(config, metric):
         elif model == 'static-FMs' or model == 'iFMs':
             res = exp.iFMs(is_static=True) if model == 'static-FMs' else exp.iFMs()
 
-        recalls, avg_recommend, avg_update = res
-        save('results/%s_%s_%s_%s_%s.txt' % (dataset, model, metric, window_size, i + 1),
-             recalls, avg_recommend, avg_update)
+        recalls, MPR, avg_recommend, avg_update = res
+        save('results/%s_%s_%s_%s.txt' % (dataset, model, window_size, i + 1),
+             recalls, MPR, avg_recommend, avg_update)
 
 
 if __name__ == '__main__':

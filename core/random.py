@@ -32,6 +32,6 @@ class Random(Base):
     def _Base__update(self, d, is_batch_train=False):
         return
 
-    def _Base__recommend(self, d, target_i_indices, at=10):
+    def _Base__recommend(self, d, target_i_indices):
         scores = np.random.rand(len(target_i_indices))
-        return self._Base__scores2recos(scores, target_i_indices, at)
+        return self._Base__scores2recos(scores, target_i_indices)

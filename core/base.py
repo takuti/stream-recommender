@@ -90,13 +90,9 @@ class Base:
 
             # 10%: evaluate the current model
             res = self.batch_evaluate(test_samples, at)
-            if at > 0:
-                logger.debug('epoch %2d: recall@%d = %f' % (epoch + 1, at, res[-1]))
-            else:
-                logger.debug('epoch %2d: MPR = %f' % (epoch + 1, res))
+            logger.debug('epoch %2d: recall@%d = %f' % (epoch + 1, at, res[-1]))
 
-        if at > 0:
-            logger.debug('[' + ', '.join([str(r) for r in res]) + ']')
+        logger.debug('[' + ', '.join([str(r) for r in res]) + ']')
 
     def batch_evaluate(self, test_samples, at):
         """Evaluate the current model by using the given test samples.
@@ -108,10 +104,7 @@ class Base:
                         top-{at} recommendation list has a true item -> TP++
 
         """
-        if at > 0:
-            n_tp = np.zeros(at)
-        else:
-            s_MPR = 0.
+        n_tp = np.zeros(at)
 
         all_items = set(range(self.n_item))
         for i, d in enumerate(test_samples):
@@ -125,22 +118,15 @@ class Base:
                 unobserved.add(d['i_index'])
 
             target_i_indices = np.asarray(list(unobserved))
-            recos = self.__recommend(d, target_i_indices, at)
+            recos = self.__recommend(d, target_i_indices)[:at]
 
-            if at > 0:
-                # is a true sample in the top-{at} recommendation list?
-                for j, reco_i_index in enumerate(recos):
-                    if reco_i_index == d['i_index']:
-                        n_tp[j:] += 1
-                        break
-            else:
-                pos = np.where(recos == d['i_index'])[0][0]
-                s_MPR += (pos / (len(recos) - 1) * 100)
+            # is a true sample in the top-{at} recommendation list?
+            for j, reco_i_index in enumerate(recos):
+                if reco_i_index == d['i_index']:
+                    n_tp[j:] += 1
+                    break
 
-        if at > 0:
-            return n_tp / float(len(test_samples))
-        else:
-            return s_MPR / float(len(test_samples))
+        return n_tp / float(len(test_samples))
 
     def evaluate(self, test_samples, window_size=5000, at=10):
         """Iterate recommend/update procedure and compute incremental recall.
@@ -155,7 +141,8 @@ class Base:
 
         """
         n_test = len(test_samples)
-        results = np.zeros(n_test)
+        recalls = np.zeros(n_test)
+        percentiles = np.zeros(n_test)
 
         window = np.zeros(window_size)
         sum_window = 0.
@@ -180,23 +167,20 @@ class Base:
 
             # make top-{at} recommendation for the 1001 items
             start = time.clock()
-            recos = self.__recommend(d, target_i_indices, at)
+            recos = self.__recommend(d, target_i_indices)
             sum_recommend_time += (time.clock() - start)
 
             # increment a hit counter if i_index is in the top-{at} recommendation list
             # i.e. score the recommendation list based on the true observed item
             wi = i % window_size
-
             old = window[wi]
-            if at > 0:
-                new = 1. if (i_index in recos) else 0.
-            else:
-                pos = np.where(recos == i_index)[0][0]
-                new = pos / (len(recos) - 1) * 100
+            new = 1. if (i_index in recos[:at]) else 0.
             window[wi] = new
-
             sum_window = sum_window - old + new
-            results[i] = sum_window / min(i + 1, window_size)
+            recalls[i] = sum_window / min(i + 1, window_size)
+
+            pos = np.where(recos == i_index)[0][0]
+            percentiles[i] = pos / (len(recos) - 1) * 100
 
             # Step 2: update the model with the observed event
             self.users[u_index]['observed'].add(i_index)
@@ -204,7 +188,7 @@ class Base:
             self.__update(d)
             sum_update_time += (time.clock() - start)
 
-        return results, sum_recommend_time / n_test, sum_update_time / n_test
+        return recalls, np.mean(percentiles), sum_recommend_time / n_test, sum_update_time / n_test
 
     @abstractmethod
     def __clear(self):
@@ -241,8 +225,8 @@ class Base:
         pass
 
     @abstractmethod
-    def __recommend(self, d, target_i_indices, at):
-        """Recommend top-{at} items for a user represented as a dictionary d.
+    def __recommend(self, d, target_i_indices):
+        """Recommend items for a user represented as a dictionary d.
 
         First, scores are computed.
         Next, `self.__scores2recos()` is called to convert the scores into a recommendation list.
@@ -250,30 +234,25 @@ class Base:
         Args:
             d (dict): A dictionary which has data of a sample.
             target_i_indices (numpy array; (# target items, )): Target items' indices. Only these items are considered as the recommendation candidates.
-            at (int): Top-{at} items will be recommended.
 
         Returns:
-            numpy array (at,): Recommendation list; top-{at} item indices.
+            numpy array : Sorted list of items.
 
         """
         return
 
-    def __scores2recos(self, scores, target_i_indices, at):
-        """Get top-{at} recommendation list for a user u_index based on scores.
+    def __scores2recos(self, scores, target_i_indices):
+        """Get recommendation list for a user u_index based on scores.
 
         Args:
             scores (numpy array; (n_target_items,)):
                 Scores for the target items. Smaller score indicates a promising item.
             target_i_indices (numpy array; (# target items, )): Target items' indices. Only these items are considered as the recommendation candidates.
-            at (int): Top-{at} items will be recommended.
 
         Returns:
-            numpy array (at,): Recommendation list; top-{at} item indices.
+            numpy array : Sorted list of items.
 
         """
 
         sorted_indices = np.argsort(scores)
-        if at > 0:
-            return target_i_indices[sorted_indices][:at]
-        else:
-            return target_i_indices[sorted_indices]
+        return target_i_indices[sorted_indices]
