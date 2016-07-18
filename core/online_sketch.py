@@ -51,6 +51,18 @@ class BaseProjection:
         return
 
 
+class Raw(BaseProjection):
+
+    def __init__(self, p):
+        self.I = np.identity(p)
+
+    def insert_proj_col(self, offset):
+        pass
+
+    def reduce(self, Y):
+        return safe_sparse_dot(self.I, Y)
+
+
 class RandomProjection(BaseProjection):
 
     def __init__(self, k, p):
@@ -152,7 +164,7 @@ class OnlineSketch(Base):
         self.contexts = contexts
         self.p = np.sum(list(contexts.values()))
 
-        self.k = k  # dimension of projected vectors
+        self.k = self.p  # dimension of projected vectors
         self.ell = int(np.sqrt(self.k))
 
         self._Base__clear()
@@ -169,7 +181,7 @@ class OnlineSketch(Base):
         self.B = np.zeros((self.k, self.ell))
 
         # initialize projection instance
-        self.proj = RandomMaclaurinProjection(self.k, self.p)
+        self.proj = Raw(self.p)
 
     def _Base__check(self, d):
 
