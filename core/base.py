@@ -82,7 +82,10 @@ class Base:
         """
         for epoch in range(n_epoch):
             # SGD requires us to shuffle samples in each iteration
-            np.random.shuffle(train_samples)
+            # * if n_epoch == 1
+            #   => shuffle is not required because it is a deterministic training (i.e. matrix sketching)
+            if n_epoch != 1:
+                np.random.shuffle(train_samples)
 
             # 20%: update models
             for d in train_samples:
