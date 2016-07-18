@@ -248,3 +248,42 @@ class OnlineSketch(Base):
         scores = ln.norm(A, axis=0, ord=2)
 
         return self._Base__scores2recos(scores, target_i_indices)
+
+
+class OnlineRandomSketch(OnlineSketch):
+
+    """Inspired by: Streaming Anomaly Detection using Randomized Matrix Sketching
+    [WIP] many matrix multiplications are computational heavy
+    """
+
+    def _Base__update(self, d, is_batch_train=False):
+        y = np.concatenate((d['user'], d['others'], d['item']))
+        y = self.proj.reduce(np.array([y]).T)
+        y = np.ravel(preprocessing.normalize(y, norm='l2', axis=0))
+
+        # combine current sketched matrix with input at time t
+        zero_cols = np.where(np.isclose(self.B, 0).all(0) == 1)[0]
+        j = zero_cols[0] if zero_cols.size != 0 else self.ell - 1  # left-most all-zero column in B
+        self.B[:, j] = y
+
+        O = np.random.normal(0., 0.1, (self.k, 100 * self.ell))
+        MM = np.dot(self.B, self.B.T)
+        Q, R = ln.qr(np.dot(MM, O))
+
+        # eig() returns eigen values/vectors with unsorted order
+        s, A = ln.eig(np.dot(np.dot(Q.T, MM), Q))
+        order = np.argsort(s)[::-1]
+        s = s[order]
+        A = A[:, order]
+
+        U = np.dot(Q, A)
+
+        # update ell orthogonal bases
+        self.U = U[:, :self.ell]
+        s = s[:self.ell]
+
+        # shrink step in the Frequent Directions algorithm
+        delta = s[-1]
+        s = np.sqrt(s - delta)
+
+        self.B = np.dot(self.U, np.diag(s))
