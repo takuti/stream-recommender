@@ -53,7 +53,8 @@ class BaseProjection:
 
 class Raw(BaseProjection):
 
-    def __init__(self, p):
+    def __init__(self, k, p):
+        # k == p
         self.I = np.identity(p)
 
     def insert_proj_col(self, offset):
@@ -159,13 +160,22 @@ class OnlineSketch(Base):
     """Inspired by: Streaming Anomaly Detection using Online Matrix Sketching
     """
 
-    def __init__(self, contexts, k=40):
+    def __init__(self, contexts, k=40, ell=-1, proj='Raw'):
 
         self.contexts = contexts
         self.p = np.sum(list(contexts.values()))
 
-        self.k = self.p  # dimension of projected vectors
-        self.ell = int(np.sqrt(self.k))
+        # dimension of projected vectors
+        # for `Raw` (i.e. w/o projection), k must equat to p
+        self.k = self.p if proj == 'Raw' else k
+
+        # if there is no preference for ell,
+        # this will be sqrt(k) similarly to what the original streaming anomaly detection paper did
+        self.ell = int(np.sqrt(self.k)) if ell == -1 else ell
+
+        # initialize projection instance which is specified by `proj` argument
+        constructor = globals()[proj]
+        self.proj = constructor(self.k, self.p)
 
         self._Base__clear()
 
@@ -179,9 +189,6 @@ class OnlineSketch(Base):
         self.i_mat = sp.csr_matrix([])
 
         self.B = np.zeros((self.k, self.ell))
-
-        # initialize projection instance
-        self.proj = Raw(self.p)
 
     def _Base__check(self, d):
 
