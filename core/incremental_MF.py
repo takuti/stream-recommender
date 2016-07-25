@@ -54,8 +54,12 @@ class IncrementalMF(Base):
 
         err = d['y'] - np.inner(u_vec, i_vec)
 
-        next_u_vec = u_vec + 2. * self.learn_rate * (err * i_vec - self.l2_reg_u * u_vec)
-        next_i_vec = i_vec + 2. * self.learn_rate * (err * u_vec - self.l2_reg_i * i_vec)
+        grad = -2. * (err * i_vec - self.l2_reg_u * u_vec)
+        next_u_vec = u_vec - self.learn_rate * grad
+
+        grad = -2. * (err * u_vec - self.l2_reg_i * i_vec)
+        next_i_vec = i_vec - self.learn_rate * grad
+
         self.users[u_index]['vec'] = next_u_vec
         self.Q[i_index] = next_i_vec
 
