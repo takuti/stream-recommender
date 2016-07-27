@@ -169,6 +169,10 @@ class OnlineSketch(Base):
         # for `Raw` (i.e. w/o projection), k must equat to p
         self.k = self.p if proj == 'Raw' else k
 
+        # number of tracked orthogonal bases
+        # (this corresponds to `k` in the original online sketching paper)
+        self.r = int(self.k / 5)
+
         # if there is no preference for ell,
         # this will be sqrt(k) similarly to what the original streaming anomaly detection paper did
         self.ell = int(np.sqrt(self.k)) if ell == -1 else ell
@@ -220,16 +224,19 @@ class OnlineSketch(Base):
 
         U, s, V = ln.svd(self.B, full_matrices=False)
 
+        # update the tracked orthonormal bases
+        self.U_r = U[:, :self.r]
+
         # update ell orthogonal bases
-        self.U = U[:, :self.ell]
-        s = s[:self.ell]
+        U_ell = U[:, :self.ell]
+        s_ell = s[:self.ell]
 
         # shrink step in the Frequent Directions algorithm
         # (shrink singular values based on the squared smallest singular value)
-        delta = s[-1] ** 2
-        s = np.sqrt(s ** 2 - delta)
+        delta = s_ell[-1] ** 2
+        s_ell = np.sqrt(s_ell ** 2 - delta)
 
-        self.B = np.dot(self.U, np.diag(s))
+        self.B = np.dot(U_ell, np.diag(s_ell))
 
     def _Base__recommend(self, d, target_i_indices):
         # i_mat is (n_item_context, n_item) for all possible items
@@ -249,7 +256,7 @@ class OnlineSketch(Base):
         Y = self.proj.reduce(Y)
         Y = sp.csr_matrix(preprocessing.normalize(Y, norm='l2', axis=0))
 
-        X = np.identity(self.k) - np.dot(self.U, self.U.T)
+        X = np.identity(self.k) - np.dot(self.U_r, self.U_r.T)
         A = safe_sparse_dot(X, Y, dense_output=True)
 
         scores = ln.norm(A, axis=0, ord=2)
@@ -285,12 +292,15 @@ class OnlineRandomSketch(OnlineSketch):
 
         U = np.dot(Q, A)
 
+        # update the tracked orthonormal bases
+        self.U_r = U[:, :self.r]
+
         # update ell orthogonal bases
-        self.U = U[:, :self.ell]
-        s = s[:self.ell]
+        U_ell = U[:, :self.ell]
+        s_ell = s[:self.ell]
 
         # shrink step in the Frequent Directions algorithm
-        delta = s[-1]
-        s = np.sqrt(s - delta)
+        delta = s_ell[-1]
+        s_ell = np.sqrt(s_ell - delta)
 
-        self.B = np.dot(self.U, np.diag(s))
+        self.B = np.dot(U_ell, np.diag(s_ell))
