@@ -218,7 +218,7 @@ class OnlineSketch(Base):
         y = np.ravel(preprocessing.normalize(y, norm='l2', axis=0))
 
         # combine current sketched matrix with input at time t
-        zero_cols = np.where(np.isclose(self.B, 0).all(0) == 1)[0]
+        zero_cols = np.nonzero([np.isclose(s_col, 0.0) for s_col in np.sum(self.B, axis=0)])[0]
         j = zero_cols[0] if zero_cols.size != 0 else self.ell - 1  # left-most all-zero column in B
         self.B[:, j] = y
 
@@ -276,7 +276,7 @@ class OnlineRandomSketch(OnlineSketch):
         y = np.ravel(preprocessing.normalize(y, norm='l2', axis=0))
 
         # combine current sketched matrix with input at time t
-        zero_cols = np.where(np.isclose(self.B, 0).all(0) == 1)[0]
+        zero_cols = np.nonzero([np.isclose(s_col, 0.0) for s_col in np.sum(self.B, axis=0)])[0]
         j = zero_cols[0] if zero_cols.size != 0 else self.ell - 1  # left-most all-zero column in B
         self.B[:, j] = y
 
