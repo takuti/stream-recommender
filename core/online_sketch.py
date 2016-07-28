@@ -160,7 +160,7 @@ class OnlineSketch(Base):
     """Inspired by: Streaming Anomaly Detection using Online Matrix Sketching
     """
 
-    def __init__(self, contexts, k=40, ell=-1, proj='Raw'):
+    def __init__(self, contexts, k=40, ell=-1, r=-1, proj='Raw'):
 
         self.contexts = contexts
         self.p = np.sum(list(contexts.values()))
@@ -169,13 +169,14 @@ class OnlineSketch(Base):
         # for `Raw` (i.e. w/o projection), k must equat to p
         self.k = self.p if proj == 'Raw' else k
 
-        # number of tracked orthogonal bases
-        # (this corresponds to `k` in the original online sketching paper)
-        self.r = int(self.k / 5)
-
         # if there is no preference for ell,
         # this will be sqrt(k) similarly to what the original streaming anomaly detection paper did
-        self.ell = int(np.sqrt(self.k)) if ell == -1 else ell
+        self.ell = int(np.sqrt(self.k)) if ell < 1 else ell
+
+        # number of tracked orthogonal bases
+        # * upper bound of r is ell (r <= ell) because U_r is obtained from SVD(B) (or SVD(E)), and
+        #   B and E always have ell columns
+        self.r = int(np.ceil(self.ell / 2)) if r < 1 else np.min(r, self.ell)
 
         # initialize projection instance which is specified by `proj` argument
         constructor = globals()[proj]
