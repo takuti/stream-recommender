@@ -192,8 +192,6 @@ class OnlineSketch(Base):
 
         self.i_mat = sp.csr_matrix([])
 
-        self.B = np.zeros((self.k, self.ell))
-
     def _Base__check(self, d):
 
         u_index = d['u_index']
@@ -216,6 +214,9 @@ class OnlineSketch(Base):
         y = np.concatenate((d['user'], d['others'], d['item']))
         y = self.proj.reduce(np.array([y]).T)
         y = np.ravel(preprocessing.normalize(y, norm='l2', axis=0))
+
+        if not hasattr(self, 'B'):
+            self.B = np.zeros((self.k, self.ell))
 
         # combine current sketched matrix with input at time t
         zero_cols = np.nonzero([np.isclose(s_col, 0.0) for s_col in np.sum(self.B, axis=0)])[0]
@@ -275,13 +276,16 @@ class OnlineRandomSketch(OnlineSketch):
         y = self.proj.reduce(np.array([y]).T)
         y = np.ravel(preprocessing.normalize(y, norm='l2', axis=0))
 
+        if not hasattr(self, 'E'):
+            self.E = np.zeros((self.k, self.ell))
+
         # combine current sketched matrix with input at time t
-        zero_cols = np.nonzero([np.isclose(s_col, 0.0) for s_col in np.sum(self.B, axis=0)])[0]
+        zero_cols = np.nonzero([np.isclose(s_col, 0.0) for s_col in np.sum(self.E, axis=0)])[0]
         j = zero_cols[0] if zero_cols.size != 0 else self.ell - 1  # left-most all-zero column in B
-        self.B[:, j] = y
+        self.E[:, j] = y
 
         O = np.random.normal(0., 0.1, (self.k, 100 * self.ell))
-        MM = np.dot(self.B, self.B.T)
+        MM = np.dot(self.E, self.E.T)
         Q, R = ln.qr(np.dot(MM, O))
 
         # eig() returns eigen values/vectors with unsorted order
@@ -303,4 +307,4 @@ class OnlineRandomSketch(OnlineSketch):
         delta = s_ell[-1]
         s_ell = np.sqrt(s_ell - delta)
 
-        self.B = np.dot(U_ell, np.diag(s_ell))
+        self.E = np.dot(U_ell, np.diag(s_ell))
