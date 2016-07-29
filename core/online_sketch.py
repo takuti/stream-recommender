@@ -309,3 +309,107 @@ class OnlineRandomSketch(OnlineSketch):
         s_ell = np.sqrt(s_ell - delta)
 
         self.E = np.dot(U_ell, np.diag(s_ell))
+
+
+class OnlineSparseSketch(OnlineSketch):
+
+    """Inspired by: Efficient Frequent Directions Algorithm for Sparse Matrices
+    """
+
+    def _Base__update(self, d, is_batch_train=False):
+        y = np.concatenate((d['user'], d['others'], d['item']))
+        y = self.proj.reduce(np.array([y]).T)
+        y = preprocessing.normalize(y, norm='l2', axis=0)  # (k, 1)
+
+        if not hasattr(self, 'B'):
+            self.p_failure = 0.1
+            self.B = np.zeros((self.k, self.ell))
+            self.A = np.array([])
+
+        U, s, V = ln.svd(self.B, full_matrices=False)
+
+        # update the tracked orthonormal bases
+        self.U_r = U[:, :self.r]
+
+        if self.A.size == 0:
+            self.A = np.empty_like(y)
+            self.A[:] = y[:]
+        else:
+            self.A = np.concatenate((self.A, y), axis=1)
+
+        if np.count_nonzero(self.A) >= (self.ell * self.k) or self.A.shape[1] == self.k:
+            B = self.__boosted_sparse_shrink(self.A, self.ell, self.p_failure)
+            self.B = self.__dense_shrink(np.concatenate((self.B, B), axis=1), self.ell)
+            self.A = np.array([])
+
+    def __simultaneous_iteration(self, A, k, eps):
+        n, d = A.shape
+
+        q = int(np.log((n / eps) / eps))
+        G = np.random.normal(0., 1., (d, k))
+
+        # Gram-Schmidt
+        Y = np.dot(np.dot(ln.matrix_power(np.dot(A, A.T), q), A), G)  # (n, k)
+        Q, R = ln.qr(Y, mode='complete')
+
+        return Q
+
+    def __sparse_shrink(self, A, ell):
+        m, d = A.shape
+
+        Z = self.__simultaneous_iteration(A, ell, 1 / 4)
+        P = sp.csr_matrix(np.dot(Z.T, A))
+
+        # 1 <= ell < min(P.shape)
+        H_ell, s_ell, V_ell = sp.linalg.svds(P, ell)
+
+        # shrink step in the Frequent Directions algorithm
+        # (shrink singular values based on the squared smallest singular value)
+        l = s_ell[-1] ** 2
+        s_ell = np.sqrt(s_ell ** 2 - l)
+
+        return np.dot(H_ell, np.diag(s_ell))
+
+    def __boosted_sparse_shrink(self, A, ell, p_failure):
+        al = (6 / 41) * ell
+        sq_norm_A = ln.norm(A, ord='fro') ** 2
+        AA = np.dot(A, A.T)
+
+        while True:
+            B = self.__sparse_shrink(A, ell)
+            delta = (sq_norm_A - (ln.norm(B, ord='fro') ** 2)) / al
+
+            C = (AA - np.dot(B, B.T)) / (delta / 2)
+            if self.__verify_spectral(C, p_failure):
+                return B
+
+    def __dense_shrink(self, A, ell):
+        H, s, V = ln.svd(A, full_matrices=False)
+
+        H_ell = H[:, :ell]
+        s_ell = s[:ell]
+
+        # shrink step in the Frequent Directions algorithm
+        # (shrink singular values based on the squared smallest singular value)
+        l = s_ell[-1] ** 2
+        s_ell = np.sqrt(s_ell ** 2 - l)
+
+        return np.dot(H_ell, np.diag(s_ell))
+
+    def __verify_spectral(self, C, p_failure):
+        d = C.shape[0]
+        c = 1  # some constant
+
+        if not hasattr(self, 'i_verify'):
+            self.i_verify = 0
+
+        self.i_verify += 1
+        p_failure_i = p_failure / (2 * (self.i_verify ** 2))
+
+        # pick a point uniformly at ranom from the d-dimensional unit sphere
+        # http://stackoverflow.com/questions/15880367/python-uniform-distribution-of-points-on-4-dimensional-sphere
+        normal_deviates = np.random.normal(size=(d, 1))
+        radius = np.sqrt((normal_deviates ** 2).sum(axis=0))
+        x = normal_deviates / radius
+
+        return ln.norm(np.dot(ln.matrix_power(C, int(c * np.log(d / p_failure_i))), x)) <= 1
