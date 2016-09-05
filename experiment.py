@@ -10,8 +10,6 @@ handler.setLevel(DEBUG)
 logger.setLevel(DEBUG)
 logger.addHandler(handler)
 
-import numpy as np
-
 from core.incremental_MF import IncrementalMF
 from core.incremental_FMs import IncrementalFMs
 from core.online_sketch import OnlineSketch
@@ -193,9 +191,11 @@ class Runner:
 @click.option('--config', '-f', help='Give a path to your config file.')
 def cli(config):
 
-    def save(path, recalls, MPR, avg_recommend, avg_update):
-        with open(path, 'w') as f:
-            f.write('\n'.join(map(str, np.append(np.array([avg_recommend, avg_update, MPR]), recalls))))
+    def save(path, res_tuples):
+        f = open(path, 'w')
+        lines = ['\t'.join([str(v) for v in t]) for t in res_tuples]
+        f.write('\n'.join(lines))
+        f.close()
 
     # parse given config file
     parser = configparser.ConfigParser()
@@ -234,9 +234,7 @@ def cli(config):
         elif model == 'static-FMs' or model == 'iFMs':
             res = exp.iFMs(is_static=True) if model == 'static-FMs' else exp.iFMs()
 
-        recalls, MPR, avg_recommend, avg_update = res
-        save('results/%s_%s_%s_%s.txt' % (dataset, model, window_size, i + 1),
-             recalls, MPR, avg_recommend, avg_update)
+        save('results/%s_%s_%s.txt' % (dataset, model, i + 1), list(res))
 
 
 if __name__ == '__main__':
