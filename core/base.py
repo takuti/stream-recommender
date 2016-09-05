@@ -143,12 +143,6 @@ class Base:
             float: Avg. recommend+update time in second.
 
         """
-        # recalls = np.zeros(n_test)
-        # window = np.zeros(window_size)
-        # sum_window = 0.
-
-        # percentiles = np.zeros(n_test)
-
         for i, d in enumerate(test_samples):
             self.__check(d)
 
@@ -168,19 +162,6 @@ class Base:
             recos = self.__recommend(d, target_i_indices)
             recommend_time = (time.clock() - start)
 
-            # increment a hit counter if i_index is in the top-{at} recommendation list
-            # i.e. score the recommendation list based on the true observed item
-            """
-            wi = i % window_size
-            old = window[wi]
-            new = 1. if (i_index in recos[:at]) else 0.
-            window[wi] = new
-            sum_window = sum_window - old + new
-            recalls[i] = sum_window / min(i + 1, window_size)
-
-            pos = np.where(recos == i_index)[0][0]
-            percentiles[i] = pos / (len(recos) - 1) * 100
-            """
             rank = np.where(recos == i_index)[0][0]
 
             # Step 2: update the model with the observed event
@@ -191,8 +172,6 @@ class Base:
 
             # (where the correct item is ranked, rec time, update time)
             yield rank, recommend_time, update_time
-
-        # return recalls, np.mean(percentiles), sum_recommend_time / n_test, sum_update_time / n_test
 
     @abstractmethod
     def __clear(self):
