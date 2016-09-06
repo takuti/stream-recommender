@@ -223,7 +223,7 @@ def cli(config):
         elif model == 'static-FMs' or model == 'iFMs':
             res = exp.iFMs(is_static=True) if model == 'static-FMs' else exp.iFMs()
 
-        save('results/%s_%s_%s.txt' % (dataset, model, i + 1), list(res))
+        save('results/%s_%s_%s.tsv' % (dataset, model, i + 1), list(res))
 
 
 if __name__ == '__main__':
