@@ -2,12 +2,7 @@ import click
 import numpy as np
 
 
-@click.command()
-@click.option('--filepath', '-f', help='Give a path to your result file.')
-@click.option('--window_size', '-w', default=1, help='Size of a window for stream evaluation.')
-@click.option('--at', default=10, help='Evaluate recall@{at}.')
-@click.option('--n_item', default=5, help='Number of items on the dataset.')
-def cli(filepath, window_size, at, n_item):
+def parse_result(filepath, window_size, at, n_item):
     f = open(filepath)
     lines = [[float(v) for v in l.rstrip().split('\t')] for l in f.readlines()]
     f.close()
@@ -35,9 +30,16 @@ def cli(filepath, window_size, at, n_item):
 
         percentiles[i] = rank / (n_item - 1) * 100
 
-    avg_recommend = np.mean(mat[:, 1])
-    avg_update = np.mean(mat[:, 2])
-    MPR = np.mean(percentiles)
+    return np.mean(mat[:, 1]), np.mean(mat[:, 2]), np.mean(percentiles), recalls
+
+
+@click.command()
+@click.option('--filepath', '-f', help='Give a path to your result file.')
+@click.option('--window_size', '-w', default=1, help='Size of a window for stream evaluation.')
+@click.option('--at', default=10, help='Evaluate recall@{at}.')
+@click.option('--n_item', default=5, help='Number of items on the dataset.')
+def cli(filepath, window_size, at, n_item):
+    avg_recommend, avg_update, MPR, recalls = parse_result(filepath, window_size, at, n_item)
 
     f = open(filepath + '.evaluate.txt', 'w')
     f.write('\n'.join(map(str, np.append(np.array([avg_recommend, avg_update, MPR]), recalls))))
