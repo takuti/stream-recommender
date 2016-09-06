@@ -21,11 +21,8 @@ from converter.converter import Converter
 
 class Runner:
 
-    def __init__(self, params, dataset='ML1M', window_size=5000, at=10, n_epoch=1):
+    def __init__(self, params, dataset='ML1M', n_epoch=1):
         self.params = params
-
-        self.window_size = window_size
-        self.at = at
 
         # number of epochs for the batch training
         self.n_epoch = n_epoch
@@ -33,7 +30,7 @@ class Runner:
         # load dataset
         self.data = Converter().convert(dataset=dataset)
 
-        logger.debug('[exp] %s | window_size = %d, n_epoch = %d' % (dataset, window_size, n_epoch))
+        logger.debug('[exp] %s | n_epoch = %d' % (dataset, n_epoch))
         logger.debug('[exp] n_sample = %d; %d (20%%) + %d (10%%) + %d (70%%)' % (
             self.data.n_sample, self.data.n_batch_train, self.data.n_batch_test, self.data.n_test))
         logger.debug('[exp] n_user = %d, n_item = %d' % (self.data.n_user, self.data.n_item))
@@ -175,14 +172,11 @@ class Runner:
         model.fit(
             self.data.samples[:self.data.n_batch_train],
             self.data.samples[self.data.n_batch_train:batch_tail],
-            at=self.at,
             n_epoch=self.n_epoch
         )
 
         # 70% incremental evaluation and updating
-        res = model.evaluate(self.data.samples[batch_tail:],
-                             window_size=self.window_size,
-                             at=self.at)
+        res = model.evaluate(self.data.samples[batch_tail:])
 
         return model, res
 
@@ -203,12 +197,7 @@ def cli(config):
 
     c = parser['Common']
     dataset = c.get('Dataset')  # ['ML1M', 'ML100k', 'LastFM', 'click']
-    window_size = c.getint('WindowSize', 5000)
     n_trial = c.getint('Trial', 1)
-
-    # Evaluation metric: Recall or MPR (Mean Percentage Ranking)
-    # at=0 indicates MPR-based evaluation
-    at = c.getint('At', 10)
 
     # ['static-MF', 'iMF', 'static-FMs', 'iFMs', 'sketch', 'random', 'popular']
     m = parser['Model']
@@ -220,7 +209,7 @@ def cli(config):
     else:
         params = {}
 
-    exp = Runner(params=params, dataset=dataset, window_size=window_size, at=at, n_epoch=n_epoch)
+    exp = Runner(params=params, dataset=dataset, n_epoch=n_epoch)
 
     for i in range(n_trial):
         if model == 'static-MF' or model == 'iMF':

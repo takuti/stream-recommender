@@ -38,7 +38,7 @@ class Base:
     def set_can_repeat(self, can_repeat):
         self.can_repeat = can_repeat
 
-    def fit(self, train_samples, test_samples, at=10, n_epoch=1):
+    def fit(self, train_samples, test_samples, n_epoch=1):
         """Train a model using the first 30% positive samples to avoid cold-start.
 
         Evaluation of this batch training is done by using the next 20% positive samples.
@@ -47,7 +47,6 @@ class Base:
         Args:
             train_samples (list of dict): Positive training samples (0-30%).
             test_sample (list of dict): Test samples (30-50%).
-            at (int): Evaluation metric of this batch pre-training will be recall@{at}.
             n_epoch (int): Number of epochs for the batch training.
 
         """
@@ -62,7 +61,7 @@ class Base:
         for d in test_samples:
             self.__check(d)
 
-        self.batch_update(train_samples, test_samples, at, n_epoch)
+        self.batch_update(train_samples, test_samples, n_epoch)
 
         # batch test samples are considered as a new observations;
         # the model is incrementally updated based on them before the incremental evaluation step
@@ -70,13 +69,12 @@ class Base:
             self.users[d['u_index']]['observed'].add(d['i_index'])
             self.__update(d)
 
-    def batch_update(self, train_samples, test_samples, at, n_epoch):
+    def batch_update(self, train_samples, test_samples, n_epoch):
         """Batch update called by the fitting method.
 
         Args:
             train_samples (list of dict): Positive training samples (0-20%).
             test_sample (list of dict): Test samples (20-30%).
-            at (int): Evaluation metric of this batch pre-training will be recall@{at}.
             n_epoch (int): Number of epochs for the batch training.
 
         """
@@ -92,22 +90,20 @@ class Base:
                 self.__update(d, is_batch_train=True)
 
             # 10%: evaluate the current model
-            res = self.batch_evaluate(test_samples, at)
-            logger.debug('epoch %2d: recall@%d = %f' % (epoch + 1, at, res[-1]))
+            MPR = self.batch_evaluate(test_samples)
+            logger.debug('epoch %2d: MPR = %f' % (epoch + 1, MPR))
 
-        logger.debug('[' + ', '.join([str(r) for r in res]) + ']')
-
-    def batch_evaluate(self, test_samples, at):
+    def batch_evaluate(self, test_samples):
         """Evaluate the current model by using the given test samples.
 
         Args:
             test_samples (list of dict): Current model is evaluated by these samples.
-            at (int): Evaluation metric is recall@{at}.
-                    For each sample,
-                        top-{at} recommendation list has a true item -> TP++
+
+        Returns:
+            float: Mean Percentile Rank for the test set.
 
         """
-        n_tp = np.zeros(at)
+        percentiles = np.zeros(len(test_samples))
 
         all_items = set(range(self.n_item))
         for i, d in enumerate(test_samples):
@@ -121,26 +117,21 @@ class Base:
                 unobserved.add(d['i_index'])
 
             target_i_indices = np.asarray(list(unobserved))
-            recos = self.__recommend(d, target_i_indices)[:at]
+            recos = self.__recommend(d, target_i_indices)
 
-            # is a true sample in the top-{at} recommendation list?
-            for j, reco_i_index in enumerate(recos):
-                if reco_i_index == d['i_index']:
-                    n_tp[j:] += 1
-                    break
+            pos = np.where(recos == d['i_index'])[0][0]
+            percentiles[i] = pos / (len(recos) - 1) * 100
 
-        return n_tp / float(len(test_samples))
+        return np.mean(percentiles)
 
-    def evaluate(self, test_samples, window_size=5000, at=10):
+    def evaluate(self, test_samples):
         """Iterate recommend/update procedure and compute incremental recall.
 
         Args:
             test_samples (list of dict): Positive test samples.
-            at (int): Top-{at} items will be recommended in each iteration.
 
         Returns:
-            float: incremental recalls@{at} / MPRs.
-            float: Avg. recommend+update time in second.
+            list of tuples: (rank, recommend time, update time)
 
         """
         for i, d in enumerate(test_samples):
