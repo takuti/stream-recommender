@@ -30,7 +30,12 @@ def parse_result(filepath, window_size, at, n_item):
 
         percentiles[i] = rank / (n_item - 1) * 100
 
-    return mat[:, 0], np.mean(mat[:, 2]), np.mean(mat[:, 3]), np.mean(percentiles), recalls
+    return {'top1_scores': mat[:, 0],
+            'avg_recommend': np.mean(mat[:, 2]),
+            'avg_update': np.mean(mat[:, 3]),
+            'MPR': np.mean(percentiles),
+            'incremental_recalls': recalls,
+            'recall': np.mean((ranks < at).astype(np.int))}
 
 
 @click.command()
@@ -39,10 +44,13 @@ def parse_result(filepath, window_size, at, n_item):
 @click.option('--at', default=10, help='Evaluate recall@{at}.')
 @click.option('--n_item', default=5, help='Number of items on the dataset.')
 def cli(filepath, window_size, at, n_item):
-    top1_scores, avg_recommend, avg_update, MPR, recalls = parse_result(filepath, window_size, at, n_item)
+    res = parse_result(filepath, window_size, at, n_item)
 
     f = open(filepath + '.evaluate.txt', 'w')
-    f.write('\n'.join(map(str, np.append(np.array([avg_recommend, avg_update, MPR]), recalls))))
+    f.write(res['avg_recommend'] + '\n')
+    f.write(res['avg_update'] + '\n')
+    f.write(res['MPR'] + '\n')
+    f.write('\n'.join(map(str, res['incremental_recalls'])))
     f.close()
 
 
