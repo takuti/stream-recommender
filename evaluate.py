@@ -17,7 +17,7 @@ def parse_result(filepath, window_size, at, n_item):
 
     percentiles = np.zeros(n_test)
 
-    ranks = mat[:, 0]
+    ranks = mat[:, 1]
     for i, rank in enumerate(ranks):
         # increment a hit counter if i_index is in the top-{at} recommendation list
         # i.e. score the recommendation list based on the true observed item
@@ -30,7 +30,7 @@ def parse_result(filepath, window_size, at, n_item):
 
         percentiles[i] = rank / (n_item - 1) * 100
 
-    return np.mean(mat[:, 1]), np.mean(mat[:, 2]), np.mean(percentiles), recalls
+    return mat[:, 0], np.mean(mat[:, 2]), np.mean(mat[:, 3]), np.mean(percentiles), recalls
 
 
 @click.command()
@@ -39,7 +39,7 @@ def parse_result(filepath, window_size, at, n_item):
 @click.option('--at', default=10, help='Evaluate recall@{at}.')
 @click.option('--n_item', default=5, help='Number of items on the dataset.')
 def cli(filepath, window_size, at, n_item):
-    avg_recommend, avg_update, MPR, recalls = parse_result(filepath, window_size, at, n_item)
+    top1_scores, avg_recommend, avg_update, MPR, recalls = parse_result(filepath, window_size, at, n_item)
 
     f = open(filepath + '.evaluate.txt', 'w')
     f.write('\n'.join(map(str, np.append(np.array([avg_recommend, avg_update, MPR]), recalls))))

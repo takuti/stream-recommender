@@ -117,7 +117,7 @@ class Base:
                 unobserved.add(d['i_index'])
 
             target_i_indices = np.asarray(list(unobserved))
-            recos = self.__recommend(d, target_i_indices)
+            recos, scores = self.__recommend(d, target_i_indices)
 
             pos = np.where(recos == d['i_index'])[0][0]
             percentiles[i] = pos / (len(recos) - 1) * 100
@@ -150,7 +150,7 @@ class Base:
 
             # make top-{at} recommendation for the 1001 items
             start = time.clock()
-            recos = self.__recommend(d, target_i_indices)
+            recos, scores = self.__recommend(d, target_i_indices)
             recommend_time = (time.clock() - start)
 
             rank = np.where(recos == i_index)[0][0]
@@ -161,8 +161,8 @@ class Base:
             self.__update(d)
             update_time = (time.clock() - start)
 
-            # (where the correct item is ranked, rec time, update time)
-            yield rank, recommend_time, update_time
+            # (top-1 score, where the correct item is ranked, rec time, update time)
+            yield scores[0], rank, recommend_time, update_time
 
     @abstractmethod
     def __clear(self):
@@ -210,7 +210,7 @@ class Base:
             target_i_indices (numpy array; (# target items, )): Target items' indices. Only these items are considered as the recommendation candidates.
 
         Returns:
-            numpy array : Sorted list of items.
+            (numpy array, numpy array) : (Sorted list of items, Sorted scores).
 
         """
         return
@@ -224,9 +224,8 @@ class Base:
             target_i_indices (numpy array; (# target items, )): Target items' indices. Only these items are considered as the recommendation candidates.
 
         Returns:
-            numpy array : Sorted list of items.
+            (numpy array, numpy array) : (Sorted list of items, Sorted scores).
 
         """
-
         sorted_indices = np.argsort(scores)
-        return target_i_indices[sorted_indices]
+        return target_i_indices[sorted_indices], scores[sorted_indices]
