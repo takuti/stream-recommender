@@ -196,12 +196,14 @@ class OnlineSketch(Base):
     def _Base__check(self, d):
 
         u_index = d['u_index']
-        if u_index not in self.users:
+        is_new_user = u_index not in self.users
+        if is_new_user:
             self.users[u_index] = {'observed': set()}
             self.n_user += 1
 
         i_index = d['i_index']
-        if i_index not in self.items:
+        is_new_item = i_index not in self.items
+        if is_new_item:
             self.items[i_index] = {}
             self.n_item += 1
 
@@ -210,6 +212,8 @@ class OnlineSketch(Base):
                 self.i_mat = i_vec
             else:
                 self.i_mat = sp.csr_matrix(sp.hstack((self.i_mat, i_vec)))
+
+        return is_new_user, is_new_item
 
     def _Base__update(self, d, is_batch_train=False):
         y = np.concatenate((d['user'], d['others'], d['item']))

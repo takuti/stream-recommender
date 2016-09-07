@@ -55,7 +55,8 @@ class IncrementalFMs(Base):
 
     def _Base__check(self, d):
         u_index = d['u_index']
-        if u_index not in self.users:
+        is_new_user = u_index not in self.users
+        if is_new_user:
             # insert new user's row for the parameters
             self.w = np.concatenate((self.w[:self.n_user], np.array([0.]), self.w[self.n_user:]))
             self.prev_w = np.concatenate((self.prev_w[:self.n_user], np.array([0.]), self.prev_w[self.n_user:]))
@@ -70,7 +71,8 @@ class IncrementalFMs(Base):
             self.p += 1
 
         i_index = d['i_index']
-        if i_index not in self.items:
+        is_new_item = i_index not in self.items
+        if is_new_item:
             # insert new item's row for the parameters
             h = self.n_user + self.n_item
             self.w = np.concatenate((self.w[:h], np.array([0.]), self.w[h:]))
@@ -95,6 +97,8 @@ class IncrementalFMs(Base):
 
             self.n_item += 1
             self.p += 1
+
+        return is_new_user, is_new_item
 
     def _Base__update(self, d, is_batch_train=False):
         # static baseline; w/o updating the model
