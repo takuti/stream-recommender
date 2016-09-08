@@ -27,6 +27,10 @@ class LastFMConverter:
         self.samples = []
         self.dts = []
 
+        # number of artists will be dimension of item contexts
+        n_artist = len(set(df_lastfm['artist_index']))
+        self.contexts['item'] = n_artist
+
         countries = list(set(df_lastfm['country']))
         n_country = len(countries)  # 16 in total
         d_country = dict(zip(countries, range(n_country)))
@@ -37,12 +41,15 @@ class LastFMConverter:
 
             user = np.concatenate((np.array([row['age']]), np.array([row['gender']]), country_vec))
 
+            artist_vec = np.zeros(n_artist)
+            artist_vec[row['artist_index']] = 1
+
             sample = {
                 'y': 1,
                 'u_index': row['u_index'],
                 'i_index': row['i_index'],
                 'user': user,
-                'item': np.array([0.]),  # no detail about items
+                'item': artist_vec,
                 'others': np.array([row['time']])
             }
 
