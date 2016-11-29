@@ -2,14 +2,6 @@
 
 import click
 
-from logging import getLogger, StreamHandler, Formatter, DEBUG
-logger = getLogger(__name__)
-handler = StreamHandler()
-handler.setFormatter(Formatter('[%(process)d] %(message)s'))
-handler.setLevel(DEBUG)
-logger.setLevel(DEBUG)
-logger.addHandler(handler)
-
 from core.incremental_MF import IncrementalMF
 from core.incremental_FMs import IncrementalFMs
 from core.online_sketch import OnlineSketch
@@ -17,6 +9,14 @@ from core.random import Random
 from core.popular import Popular
 
 from converter.converter import Converter
+
+from logging import getLogger, StreamHandler, Formatter, DEBUG
+logger = getLogger(__name__)
+handler = StreamHandler()
+handler.setFormatter(Formatter('[%(process)d] %(message)s'))
+handler.setLevel(DEBUG)
+logger.setLevel(DEBUG)
+logger.addHandler(handler)
 
 
 class Runner:
