@@ -2,11 +2,13 @@
 
 import click
 
-from core.incremental_MF import IncrementalMF
-from core.incremental_FMs import IncrementalFMs
-from core.online_sketch import OnlineSketch
-from core.random import Random
-from core.popular import Popular
+from flurs.model.mf import IncrementalMF
+from flurs.model.fm import IncrementalFMs
+from flurs.model.sketch import OnlineSketch
+from flurs.baseline.random import Random
+from flurs.baseline.popular import Popular
+
+from flurs.evaluator import Evaluator
 
 from converter.converter import Converter
 
@@ -164,19 +166,21 @@ class Runner:
         batch_tail = self.data.n_batch_train + self.data.n_batch_test
 
         model = callback()
-        model.set_can_repeat(self.data.can_repeat)
+        evaluator = Evaluator(model)
+
+        evaluator.set_can_repeat(self.data.can_repeat)
 
         # pre-train
         # 20% for batch training | 10% for batch evaluate
         # after the batch training, 10% samples are used for incremental updating
-        model.fit(
+        evaluator.fit(
             self.data.samples[:self.data.n_batch_train],
             self.data.samples[self.data.n_batch_train:batch_tail],
             n_epoch=self.n_epoch
         )
 
         # 70% incremental evaluation and updating
-        res = model.evaluate(self.data.samples[batch_tail:])
+        res = evaluator.evaluate(self.data.samples[batch_tail:])
 
         return model, res
 
