@@ -61,7 +61,7 @@ class SyntheticClickConverter:
 
             sample = {
                 'y': 1,
-                'u_index': u_index,
+                'u_index': 0,
                 'i_index': i_index,
                 'user': user,
                 'item': category,
