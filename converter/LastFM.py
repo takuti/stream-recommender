@@ -8,7 +8,7 @@ import os
 
 class LastFMConverter:
 
-    """See also LastFM.ipynb for preprocessing.
+    """See `notebook/LastFM.ipynb` to know how `lastfm.tsv` was generated.
     """
 
     def __init__(self):
