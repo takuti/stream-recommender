@@ -9,7 +9,7 @@ class SyntheticClickConverter:
 
     """Dataset will be generated as:
 
-    $ julia clickgenerator.jl > click.tsv
+    $ julia tool/clickgenerator.jl > click.tsv
     """
 
     def __init__(self):
