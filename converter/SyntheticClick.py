@@ -1,5 +1,6 @@
 # conding: utf-8
 
+from flurs.types import User, Item, Event
 import numpy as np
 
 
@@ -53,22 +54,17 @@ class SyntheticClickConverter:
             # clickgenerator.jl generates a birth year in [1930, 2000]
             age = 1. - ((2000 - year) / 70.)
 
-            user = np.concatenate((np.array([age]), np.array([sex]), geo_vec))
+            user = User(0, np.concatenate((np.array([age]), np.array([sex]), geo_vec)))
 
             # category vector
             category = np.zeros(3)
             category[ad_categories[i_index]] = 1
 
-            sample = {
-                'y': 1,
-                'u_index': 0,
-                'i_index': i_index,
-                'user': user,
-                'item': category,
-                'others': np.array([0.])
-            }
+            item = Item(i_index, category)
 
+            sample = Event(user, item, 1.)
             self.samples.append(sample)
+
             u_index += 1
 
         self.n_user = u_index

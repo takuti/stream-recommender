@@ -1,5 +1,7 @@
 # coding: utf-8
 
+from flurs.types import User, Item, Event
+
 import numpy as np
 import time
 from calendar import monthrange
@@ -69,18 +71,10 @@ class MovieLens100kConverter:
 
             others = np.concatenate((weekday_vec, last_item_vec, last_weekday_vec))
 
-            # true value to compute gradient
-            y = 1.
+            user = User(u_index, users[user_id])
+            item = Item(i_index, movies[item_id])
 
-            sample = {
-                'y': y,
-                'u_index': u_index,
-                'i_index': i_index,
-                'item': movies[item_id],
-                'user': users[user_id],
-                'others': others
-            }
-
+            sample = Event(user, item, 1., others)
             self.samples.append(sample)
 
             # record users' last rated movie features

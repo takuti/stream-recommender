@@ -1,5 +1,6 @@
 # coding: utf-8
 
+from flurs.types import User, Item, Event
 import numpy as np
 import pandas as pd
 
@@ -39,21 +40,17 @@ class LastFMConverter:
             country_vec = np.zeros(n_country)
             country_vec[d_country[row['country']]] = 1.
 
-            user = np.concatenate((np.array([row['age']]), np.array([row['gender']]), country_vec))
+            user = User(row['u_index'],
+                        np.concatenate((np.array([row['age']]), np.array([row['gender']]), country_vec)))
 
             artist_vec = np.zeros(n_artist)
             artist_vec[row['artist_index']] = 1
 
-            sample = {
-                'y': 1,
-                'u_index': row['u_index'],
-                'i_index': row['i_index'],
-                'user': user,
-                'item': artist_vec,
-                'others': np.array([row['time']])
-            }
+            item = Item(row['i_index'], artist_vec)
 
+            sample = Event(user, item, 1., np.array([row['time']]))
             self.samples.append(sample)
+
             self.dts.append(row['dt'])
 
         self.n_user = len(set(df_lastfm['userid']))
