@@ -2,6 +2,7 @@
 
 from flurs.types import User, Item, Event
 import numpy as np
+import os
 
 
 class SyntheticClickConverter:
@@ -30,7 +31,7 @@ class SyntheticClickConverter:
         """
 
         clicks = []
-        with open('converter/click.tsv') as f:
+        with open(os.path.join(os.path.dirname(__file__), 'click.tsv')) as f:
             clicks = list(map(lambda l: list(map(int, l.rstrip().split('\t'))), f.readlines()))
 
         self.samples = []

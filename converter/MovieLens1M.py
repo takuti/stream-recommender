@@ -4,6 +4,7 @@ from flurs.types import User, Item, Event
 
 import numpy as np
 import time
+import os
 from calendar import monthrange
 from datetime import datetime, timedelta
 
@@ -11,10 +12,11 @@ from datetime import datetime, timedelta
 class MovieLens1MConverter:
 
     def __init__(self):
+        here = os.path.dirname(__file__)
         self.path = {
-            'ratings': '../../data/ml-1m/ratings.dat',
-            'items': '../../data/ml-1m/movies.dat',
-            'users': '../../data/ml-1m/users.dat'
+            'ratings': os.path.join(here, '../../../data/ml-1m/ratings.dat'),
+            'items': os.path.join(here, '../../../data/ml-1m/movies.dat'),
+            'users': os.path.join(here, '../../../data/ml-1m/users.dat')
         }
 
         # contexts in this dataset

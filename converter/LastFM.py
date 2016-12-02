@@ -3,6 +3,7 @@
 from flurs.types import User, Item, Event
 import numpy as np
 import pandas as pd
+import os
 
 
 class LastFMConverter:
@@ -23,7 +24,7 @@ class LastFMConverter:
         """Create a list of samples and count number of users/items.
 
         """
-        df_lastfm = pd.read_csv('converter/lastfm.tsv', delimiter='\t')
+        df_lastfm = pd.read_csv(os.path.join(os.path.dirname(__file__), 'lastfm.tsv'), delimiter='\t')
 
         self.samples = []
         self.dts = []
