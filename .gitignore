@@ -1,6 +1,7 @@
-.*.swp
 .DS_Store
+.*.swp
 *.pyc
 .ipynb_checkpoints/
-results/
-*.tsv
+results/*
+data/*
+!.gitkeep
