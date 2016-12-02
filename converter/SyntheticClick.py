@@ -9,7 +9,7 @@ class SyntheticClickConverter:
 
     """Dataset will be generated as:
 
-    $ julia tool/clickgenerator.jl > click.tsv
+    $ julia tool/clickgenerator.jl > data/click.tsv
     """
 
     def __init__(self):
@@ -31,7 +31,7 @@ class SyntheticClickConverter:
         """
 
         clicks = []
-        with open(os.path.join(os.path.dirname(__file__), 'click.tsv')) as f:
+        with open(os.path.join(os.path.dirname(__file__), '../data/click.tsv')) as f:
             clicks = list(map(lambda l: list(map(int, l.rstrip().split('\t'))), f.readlines()))
 
         self.samples = []

@@ -14,9 +14,9 @@ class MovieLens1MConverter:
     def __init__(self):
         here = os.path.dirname(__file__)
         self.path = {
-            'ratings': os.path.join(here, '../../../data/ml-1m/ratings.dat'),
-            'items': os.path.join(here, '../../../data/ml-1m/movies.dat'),
-            'users': os.path.join(here, '../../../data/ml-1m/users.dat')
+            'ratings': os.path.join(here, '../data/ml-1m/ratings.dat'),
+            'items': os.path.join(here, '../data/ml-1m/movies.dat'),
+            'users': os.path.join(here, '../data/ml-1m/users.dat')
         }
 
         # contexts in this dataset

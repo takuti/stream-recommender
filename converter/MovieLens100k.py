@@ -14,9 +14,9 @@ class MovieLens100kConverter:
     def __init__(self):
         here = os.path.dirname(__file__)
         self.path = {
-            'ratings': os.path.join(here, '../../../data/ml-100k/u.data'),
-            'items': os.path.join(here, '../../../data/ml-100k/u.item'),
-            'users': os.path.join(here, '../../../data/ml-100k/u.user')
+            'ratings': os.path.join(here, '../data/ml-100k/u.data'),
+            'items': os.path.join(here, '../data/ml-100k/u.item'),
+            'users': os.path.join(here, '../data/ml-100k/u.user')
         }
 
         # contexts in this dataset

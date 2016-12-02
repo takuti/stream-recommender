@@ -24,7 +24,7 @@ class LastFMConverter:
         """Create a list of samples and count number of users/items.
 
         """
-        df_lastfm = pd.read_csv(os.path.join(os.path.dirname(__file__), 'lastfm.tsv'), delimiter='\t')
+        df_lastfm = pd.read_csv(os.path.join(os.path.dirname(__file__), '../data/lastfm.tsv'), delimiter='\t')
 
         self.samples = []
         self.dts = []
