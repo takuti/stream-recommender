@@ -2,6 +2,7 @@
 
 import click
 
+from flurs.model.user_knn import UserKNN
 from flurs.model.mf import IncrementalMF
 from flurs.model.fm import IncrementalFMs
 from flurs.model.sketch import OnlineSketch
@@ -95,6 +96,23 @@ class Runner:
                 model.l2_reg_w0,
                 model.l2_reg_w,
                 model.l2_reg_V))
+
+        return res
+
+    def user_knn(self):
+        """User-based incremental collaborative filtering.
+
+        Returns:
+            list of float values: Simple Moving Averages (i.e. incremental recall).
+            float: average time to recommend/update for one sample
+
+        """
+        logger.debug('# user knn')
+
+        def create():
+            return UserKNN(k=int(self.params['k']))
+
+        model, res = self.__run(create)
 
         return res
 
@@ -218,6 +236,8 @@ def cli(config):
     for i in range(n_trial):
         if model == 'static-MF' or model == 'iMF':
             res = exp.iMF(is_static=True) if model == 'static-MF' else exp.iMF()
+        elif model == 'user-knn':
+            res = exp.user_knn()
         elif model == 'sketch':
             res = exp.sketch()
         elif model == 'random':
