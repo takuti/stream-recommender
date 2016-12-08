@@ -4,6 +4,7 @@ import click
 
 from flurs.model.user_knn import UserKNN
 from flurs.model.mf import IncrementalMF
+from flurs.model.bprmf import BPRMF
 from flurs.model.fm import IncrementalFMs
 from flurs.model.sketch import OnlineSketch
 from flurs.baseline.random import Random
@@ -61,6 +62,24 @@ class Runner:
                                  int(self.params['k']),
                                  self.params['l2_reg'],
                                  self.params['learn_rate'])
+
+        model, res = self.__run(create)
+        return res
+
+    def bprmf(self):
+        """Incremental Matrix Factorization with BPR optimization
+
+        Returns:
+            list of float values: Simple Moving Averages (i.e. incremental recall).
+            float: average time to recommend/update for one sample
+
+        """
+        logger.debug('# BPRMF')
+
+        def create():
+            return BPRMF(int(self.params['k']),
+                         self.params['l2_reg'],
+                         self.params['learn_rate'])
 
         model, res = self.__run(create)
         return res
@@ -236,6 +255,8 @@ def cli(config):
     for i in range(n_trial):
         if model == 'static-MF' or model == 'iMF':
             res = exp.iMF(is_static=True) if model == 'static-MF' else exp.iMF()
+        elif model == 'bprmf':
+            res = exp.bprmf()
         elif model == 'user-knn':
             res = exp.user_knn()
         elif model == 'sketch':
