@@ -3,9 +3,9 @@
 import click
 
 from flurs.model.user_knn import UserKNN
-from flurs.model.mf import IncrementalMF
+from flurs.model.mf import MatrixFactorization
 from flurs.model.bprmf import BPRMF
-from flurs.model.fm import IncrementalFMs
+from flurs.model.fm import FactorizationMachine
 from flurs.model.sketch import OnlineSketch
 from flurs.baseline.random import Random
 from flurs.baseline.popular import Popular
@@ -58,10 +58,10 @@ class Runner:
             logger.debug('# iMF')
 
         def create():
-            return IncrementalMF(is_static,
-                                 int(self.params['k']),
-                                 self.params['l2_reg'],
-                                 self.params['learn_rate'])
+            return MatrixFactorization(is_static,
+                                       int(self.params['k']),
+                                       self.params['l2_reg'],
+                                       self.params['learn_rate'])
 
         model, res = self.__run(create)
         return res
@@ -101,12 +101,12 @@ class Runner:
             logger.debug('# iFMs')
 
         def create():
-            return IncrementalFMs(self.data.contexts, is_static,
-                                  int(self.params['k']),
-                                  self.params['l2_reg_w0'],
-                                  self.params['l2_reg_w'],
-                                  self.params['l2_reg_v'],
-                                  self.params['learn_rate'])
+            return FactorizationMachine(self.data.contexts, is_static,
+                                        int(self.params['k']),
+                                        self.params['l2_reg_w0'],
+                                        self.params['l2_reg_w'],
+                                        self.params['l2_reg_v'],
+                                        self.params['learn_rate'])
 
         model, res = self.__run(create)
 
