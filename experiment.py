@@ -203,7 +203,10 @@ class Runner:
         batch_tail = self.data.n_batch_train + self.data.n_batch_test
 
         model = callback()
-        evaluator = Evaluator(model)
+        if hasattr(self.data, 'maxlen'):
+            evaluator = Evaluator(model, self.data.maxlen)
+        else:
+            evaluator = Evaluator(model)
 
         evaluator.set_can_repeat(self.data.can_repeat)
 
