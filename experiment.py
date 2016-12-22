@@ -2,11 +2,11 @@
 
 import click
 
-from flurs.model.user_knn import UserKNN
-from flurs.model.mf import MatrixFactorization
-from flurs.model.bprmf import BPRMF
-from flurs.model.fm import FactorizationMachine
-from flurs.model.sketch import OnlineSketch
+from flurs.recommender.user_knn import UserKNNRecommender
+from flurs.recommender.mf import MFRecommender
+from flurs.recommender.bprmf import BPRMFRecommender
+from flurs.recommender.fm import FMRecommender
+from flurs.recommender.sketch import SketchRecommender
 from flurs.baseline.random import Random
 from flurs.baseline.popular import Popular
 
@@ -58,10 +58,10 @@ class Runner:
             logger.debug('# iMF')
 
         def create():
-            return MatrixFactorization(is_static,
-                                       int(self.params['k']),
-                                       self.params['l2_reg'],
-                                       self.params['learn_rate'])
+            return MFRecommender(is_static,
+                                 int(self.params['k']),
+                                 self.params['l2_reg'],
+                                 self.params['learn_rate'])
 
         model, res = self.__run(create)
         return res
@@ -77,9 +77,9 @@ class Runner:
         logger.debug('# BPRMF')
 
         def create():
-            return BPRMF(int(self.params['k']),
-                         self.params['l2_reg'],
-                         self.params['learn_rate'])
+            return BPRMFRecommender(int(self.params['k']),
+                                    self.params['l2_reg'],
+                                    self.params['learn_rate'])
 
         model, res = self.__run(create)
         return res
@@ -101,12 +101,12 @@ class Runner:
             logger.debug('# iFMs')
 
         def create():
-            return FactorizationMachine(self.data.contexts, is_static,
-                                        int(self.params['k']),
-                                        self.params['l2_reg_w0'],
-                                        self.params['l2_reg_w'],
-                                        self.params['l2_reg_v'],
-                                        self.params['learn_rate'])
+            return FMRecommender(self.data.contexts, is_static,
+                                 int(self.params['k']),
+                                 self.params['l2_reg_w0'],
+                                 self.params['l2_reg_w'],
+                                 self.params['l2_reg_v'],
+                                 self.params['learn_rate'])
 
         model, res = self.__run(create)
 
@@ -129,7 +129,7 @@ class Runner:
         logger.debug('# user knn')
 
         def create():
-            return UserKNN(k=int(self.params['k']))
+            return UserKNNRecommender(k=int(self.params['k']))
 
         model, res = self.__run(create)
 
@@ -146,9 +146,9 @@ class Runner:
         logger.debug('# matrix sketching')
 
         def create():
-            return OnlineSketch(contexts=self.data.contexts,
-                                k=int(self.params['k']),
-                                ell=int(self.params['ell']))
+            return SketchRecommender(contexts=self.data.contexts,
+                                     k=int(self.params['k']),
+                                     ell=int(self.params['ell']))
 
         model, res = self.__run(create)
 
