@@ -4,12 +4,23 @@ from collections import deque
 
 
 def measure(n_item, at, metric, rank):
+    # rank is in [0, n_item)
     if metric == 'recall':
         return 1. if (rank < at) else 0.
     elif metric == 'precision':
         return 1 / at if (rank < at) else 0.
+    elif metric == 'map' or metric == 'mrr':
+        return 1 / (rank + 1)
+    elif metric == 'auc':
+        correct = n_item - (rank + 1)
+        pairs = 1 * (n_item - 1)
+        return correct / pairs
     elif metric == 'mpr':
         return rank / (n_item - 1) * 100
+    elif metric == 'ndcg':
+        dcg = 1 / np.log2(rank + 2) if (rank < at) else 0.
+        idcg = sum([1 / np.log2(n + 1) for n in range(1, at + 1)])
+        return dcg / idcg
 
 
 def parse_result(filepath, window_size, n_item, at=10, metric='recall'):
