@@ -1,41 +1,37 @@
 import click
 import numpy as np
+from collections import deque
 
 
-def parse_result(filepath, window_size, at, n_item):
+def measure(n_item, at, metric, rank):
+    if metric == 'recall':
+        return 1. if (rank < at) else 0.
+    elif metric == 'precision':
+        return 1 / at if (rank < at) else 0.
+    elif metric == 'mpr':
+        return rank / (n_item - 1) * 100
+
+
+def parse_result(filepath, window_size, n_item, at=10, metric='recall'):
     f = open(filepath)
     lines = [[float(v) for v in l.rstrip().split('\t')] for l in f.readlines()]
     f.close()
 
     mat = np.array(lines)
-
-    n_test = mat.shape[0]
-
-    recalls = np.zeros(n_test)
-    window = np.zeros(window_size)
-    sum_window = 0.
-
-    percentiles = np.zeros(n_test)
-
     ranks = mat[:, 1]
-    for i, rank in enumerate(ranks):
-        # increment a hit counter if i_index is in the top-{at} recommendation list
-        # i.e. score the recommendation list based on the true observed item
-        wi = i % window_size
-        old = window[wi]
-        new = 1. if (rank < at) else 0.
-        window[wi] = new
-        sum_window = sum_window - old + new
-        recalls[i] = sum_window / min(i + 1, window_size)
 
-        percentiles[i] = rank / (n_item - 1) * 100
+    window = deque(maxlen=window_size)
+    res = np.array([])
+
+    for i, rank in enumerate(ranks):
+        v = measure(n_item, at, metric, rank)
+        window.append(v)
+        res = np.append(res, np.mean(window))
 
     return {'top1_scores': mat[:, 0],
             'avg_recommend': np.mean(mat[:, 2]),
             'avg_update': np.mean(mat[:, 3]),
-            'MPR': np.mean(percentiles),
-            'incremental_recalls': recalls,
-            'recall': np.mean((ranks < at).astype(np.int))}
+            'res': res}
 
 
 @click.command()
