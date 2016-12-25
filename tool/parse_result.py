@@ -55,6 +55,8 @@ def parse_result(filepath, window_size, n_item, at=10):
            'mpr': np.zeros(n_test),
            'ndcg': np.zeros(n_test)}
 
+    percentiles = np.zeros(n_test)
+
     for i, rank in enumerate(ranks):
         for metric in ['recall', 'precision', 'map', 'mrr', 'auc', 'mpr', 'ndcg']:
             wi = i % window_size
@@ -68,6 +70,8 @@ def parse_result(filepath, window_size, n_item, at=10):
 
             res[metric][i] = sums[metric] / min(i + 1, window_size)
 
+        percentiles[i] = measure(n_item, at, 'mpr', rank)
+
     return {'top1_scores': mat[:, 0],
             'avg_recommend': np.mean(mat[:, 2]),
             'avg_update': np.mean(mat[:, 3]),
@@ -77,7 +81,9 @@ def parse_result(filepath, window_size, n_item, at=10):
             'mrr': res['mrr'],
             'auc': res['auc'],
             'mpr': res['mpr'],
-            'ndcg': res['ndcg']}
+            'ndcg': res['ndcg'],
+            'static_mpr': np.mean(percentiles),
+            'static_recall': np.mean((ranks < at).astype(np.int))}
 
 
 @click.command()
