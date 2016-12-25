@@ -1,6 +1,5 @@
 import click
 import numpy as np
-from collections import deque
 
 
 def measure(n_item, at, metric, rank):
@@ -23,26 +22,62 @@ def measure(n_item, at, metric, rank):
         return dcg / idcg
 
 
-def parse_result(filepath, window_size, n_item, at=10, metric='recall'):
+def parse_result(filepath, window_size, n_item, at=10):
     f = open(filepath)
     lines = [[float(v) for v in l.rstrip().split('\t')] for l in f.readlines()]
     f.close()
 
     mat = np.array(lines)
+    n_test = mat.shape[0]
     ranks = mat[:, 1]
 
-    window = deque(maxlen=window_size)
-    res = np.array([])
+    windows = {'recall': np.zeros(window_size),
+               'precision': np.zeros(window_size),
+               'map': np.zeros(window_size),
+               'mrr': np.zeros(window_size),
+               'auc': np.zeros(window_size),
+               'mpr': np.zeros(window_size),
+               'ndcg': np.zeros(window_size)}
+
+    sums = {'recall': 0,
+            'precision': 0,
+            'map': 0,
+            'mrr': 0,
+            'auc': 0,
+            'mpr': 0,
+            'ndcg': 0}
+
+    res = {'recall': np.zeros(n_test),
+           'precision': np.zeros(n_test),
+           'map': np.zeros(n_test),
+           'mrr': np.zeros(n_test),
+           'auc': np.zeros(n_test),
+           'mpr': np.zeros(n_test),
+           'ndcg': np.zeros(n_test)}
 
     for i, rank in enumerate(ranks):
-        v = measure(n_item, at, metric, rank)
-        window.append(v)
-        res = np.append(res, np.mean(window))
+        for metric in ['recall', 'precision', 'map', 'mrr', 'auc', 'mpr', 'ndcg']:
+            wi = i % window_size
+
+            old = windows[metric][wi]
+
+            new = measure(n_item, at, metric, rank)
+            windows[metric][wi] = new
+
+            sums[metric] = sums[metric] - old + new
+
+            res[metric][i] = sums[metric] / min(i + 1, window_size)
 
     return {'top1_scores': mat[:, 0],
             'avg_recommend': np.mean(mat[:, 2]),
             'avg_update': np.mean(mat[:, 3]),
-            'res': res}
+            'recall': res['recall'],
+            'precision': res['precision'],
+            'map': res['map'],
+            'mrr': res['mrr'],
+            'auc': res['auc'],
+            'mpr': res['mpr'],
+            'ndcg': res['ndcg']}
 
 
 @click.command()
