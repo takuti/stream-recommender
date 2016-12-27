@@ -22,7 +22,8 @@ def measure(n_item, at, metric, rank):
         return dcg / idcg
 
 
-def parse_result(filepath, window_size, n_item, at=10):
+def parse_result(filepath, window_size, n_item, at=10,
+                 metrics=['recall', 'precision', 'map', 'mrr', 'auc', 'mpr', 'ndcg']):
     f = open(filepath)
     lines = [[float(v) for v in l.rstrip().split('\t')] for l in f.readlines()]
     f.close()
@@ -31,34 +32,14 @@ def parse_result(filepath, window_size, n_item, at=10):
     n_test = mat.shape[0]
     ranks = mat[:, 1]
 
-    windows = {'recall': np.zeros(window_size),
-               'precision': np.zeros(window_size),
-               'map': np.zeros(window_size),
-               'mrr': np.zeros(window_size),
-               'auc': np.zeros(window_size),
-               'mpr': np.zeros(window_size),
-               'ndcg': np.zeros(window_size)}
-
-    sums = {'recall': 0,
-            'precision': 0,
-            'map': 0,
-            'mrr': 0,
-            'auc': 0,
-            'mpr': 0,
-            'ndcg': 0}
-
-    res = {'recall': np.zeros(n_test),
-           'precision': np.zeros(n_test),
-           'map': np.zeros(n_test),
-           'mrr': np.zeros(n_test),
-           'auc': np.zeros(n_test),
-           'mpr': np.zeros(n_test),
-           'ndcg': np.zeros(n_test)}
+    windows = {metric: np.zeros(window_size) for metric in metrics}
+    sums = {metric: 0 for metric in metrics}
+    res = {metric: np.zeros(n_test) for metric in metrics}
 
     percentiles = np.zeros(n_test)
 
     for i, rank in enumerate(ranks):
-        for metric in ['recall', 'precision', 'map', 'mrr', 'auc', 'mpr', 'ndcg']:
+        for metric in metrics:
             wi = i % window_size
 
             old = windows[metric][wi]
@@ -72,18 +53,12 @@ def parse_result(filepath, window_size, n_item, at=10):
 
         percentiles[i] = measure(n_item, at, 'mpr', rank)
 
-    return {'top1_scores': mat[:, 0],
-            'avg_recommend': np.mean(mat[:, 2]),
-            'avg_update': np.mean(mat[:, 3]),
-            'recall': res['recall'],
-            'precision': res['precision'],
-            'map': res['map'],
-            'mrr': res['mrr'],
-            'auc': res['auc'],
-            'mpr': res['mpr'],
-            'ndcg': res['ndcg'],
-            'static_mpr': np.mean(percentiles),
-            'static_recall': np.mean((ranks < at).astype(np.int))}
+    return {**res,
+            **{'top1_scores': mat[:, 0],
+               'avg_recommend': np.mean(mat[:, 2]),
+               'avg_update': np.mean(mat[:, 3]),
+               'static_mpr': np.mean(percentiles),
+               'static_recall': np.mean((ranks < at).astype(np.int))}}
 
 
 @click.command()
