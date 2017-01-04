@@ -217,11 +217,9 @@ class Runner:
 
         model = callback()
         if hasattr(self.data, 'maxlen'):
-            evaluator = Evaluator(model, self.data.maxlen)
+            evaluator = Evaluator(model, self.data.can_repeat, self.data.maxlen)
         else:
-            evaluator = Evaluator(model)
-
-        evaluator.set_can_repeat(self.data.can_repeat)
+            evaluator = Evaluator(model, self.data.can_repeat)
 
         # pre-train
         # 20% for batch training | 10% for batch evaluate
