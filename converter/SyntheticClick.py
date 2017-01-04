@@ -1,6 +1,6 @@
 # conding: utf-8
 
-from flurs.entity_types import User, Item, Event
+from flurs.data.entity import User, Item, Event
 import numpy as np
 import os
 

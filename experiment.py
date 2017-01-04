@@ -58,10 +58,11 @@ class Runner:
             logger.debug('# iMF')
 
         def create():
-            return MFRecommender(is_static,
-                                 int(self.params['k']),
-                                 self.params['l2_reg'],
-                                 self.params['learn_rate'])
+            rec = MFRecommender(int(self.params['k']),
+                                self.params['l2_reg'],
+                                self.params['learn_rate'])
+            rec.init_recommender(is_static)
+            return rec
 
         model, res = self.__run(create)
         return res
@@ -77,9 +78,11 @@ class Runner:
         logger.debug('# BPRMF')
 
         def create():
-            return BPRMFRecommender(int(self.params['k']),
-                                    self.params['l2_reg'],
-                                    self.params['learn_rate'])
+            rec = BPRMFRecommender(int(self.params['k']),
+                                   self.params['l2_reg'],
+                                   self.params['learn_rate'])
+            rec.init_recommender()
+            return rec
 
         model, res = self.__run(create)
         return res
@@ -101,12 +104,14 @@ class Runner:
             logger.debug('# iFMs')
 
         def create():
-            return FMRecommender(self.data.contexts, is_static,
-                                 int(self.params['k']),
-                                 self.params['l2_reg_w0'],
-                                 self.params['l2_reg_w'],
-                                 self.params['l2_reg_v'],
-                                 self.params['learn_rate'])
+            rec = FMRecommender(sum(self.data.contexts.values()),
+                                int(self.params['k']),
+                                self.params['l2_reg_w0'],
+                                self.params['l2_reg_w'],
+                                self.params['l2_reg_v'],
+                                self.params['learn_rate'])
+            rec.init_recommender(is_static)
+            return rec
 
         model, res = self.__run(create)
 
@@ -129,7 +134,9 @@ class Runner:
         logger.debug('# user knn')
 
         def create():
-            return UserKNNRecommender(k=int(self.params['k']))
+            rec = UserKNNRecommender(k=int(self.params['k']))
+            rec.init_recommender()
+            return rec
 
         model, res = self.__run(create)
 
@@ -146,9 +153,11 @@ class Runner:
         logger.debug('# matrix sketching')
 
         def create():
-            return SketchRecommender(contexts=self.data.contexts,
-                                     k=int(self.params['k']),
-                                     ell=int(self.params['ell']))
+            rec = SketchRecommender(p=sum(self.data.contexts.values()),
+                                    k=int(self.params['k']),
+                                    ell=int(self.params['ell']))
+            rec.init_recommender()
+            return rec
 
         model, res = self.__run(create)
 
@@ -165,7 +174,9 @@ class Runner:
         logger.debug('# random baseline')
 
         def create():
-            return Random()
+            rec = Random()
+            rec.init_recommender()
+            return rec
 
         model, res = self.__run(create)
 
@@ -182,7 +193,9 @@ class Runner:
         logger.debug('# popularity baseline')
 
         def create():
-            return Popular()
+            rec = Popular()
+            rec.init_recommender()
+            return rec
 
         model, res = self.__run(create)
 
